@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import numpy as np
 import torch
+from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 
 from .math import identity_tensor
 
@@ -9,7 +11,7 @@ class PermutationCoordinateDescent:
     """
     Find permutations by matching weights.
 
-    Assumes a MLP with weights of same shape in each layer.
+    Assumes an MLP with weights of same shape in each layer.
     """
 
     def __init__(self, model1: torch.nn.Module, model2: torch.nn.Module) -> None:
@@ -47,3 +49,39 @@ class PermutationCoordinateDescent:
                 assert hasattr(module1, "weight"), ident_str
 
         return perms, weights, windices
+
+    def coordinate_descent(self) -> None:
+        """Calculate the permutations."""
+        perm_changes = [True] * len(self.weights)
+
+        while any(perm_changes):
+            perm_changes = self._coordinate_descent_step()
+
+    def _coordinate_descent_step(self) -> list[bool]:
+        layer_nums = np.arange(len(self.weights) - 2) + 1
+        shuffled_layers = np.random.default_rng().permutation(layer_nums)
+        perm_changes: list[bool] = []
+
+        for i in shuffled_layers:
+            p_last = self.wperms[i-1]
+            p_next = self.wperms[i+1]
+            w_a, w_b = self.weights[i][0], self.weights[i][1]
+            w_a_next, w_b_next = self.weights[i+1][0], self.weights[i+1][1]
+
+            cost_matrix = (w_a @ p_last @ w_b).mT + (w_a_next @ p_next @ w_b_next)
+
+            row_ind, col_ind = linear_sum_assignment(
+                cost_matrix.cpu().detach().numpy(), maximize=True
+            )
+
+            perm = self.wperms[i][row_ind]
+            perm = perm[:, col_ind]
+            self.wperms[i] = perm
+
+            changed = (
+                    sorted(list(row_ind)) == list(row_ind)
+                    and sorted(list(col_ind)) == col_ind
+            )
+            perm_changes.append(changed.any())  # type: ignore[union-attr]
+
+        return perm_changes
