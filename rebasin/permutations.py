@@ -85,3 +85,15 @@ class PermutationCoordinateDescent:
             perm_changes.append(changed.any())  # type: ignore[union-attr]
 
         return perm_changes
+
+    def rebasin(self) -> None:
+        """Re-basin model2."""
+        modules = list(self.model2.modules())
+
+        for i, wind in enumerate(self.windices):
+            perm = self.wperms[i]
+            perm_last = self.wperms[i-1] if i > 0 else perm
+            module = modules[wind]
+
+            weight = torch.nn.Parameter(perm @ module.weight @ perm_last.mT)
+            module.weight = weight
