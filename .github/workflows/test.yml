@@ -36,6 +36,6 @@ jobs:
     - name: pytest
       if: ${{ matrix.pytorch-version != '1.13' }}
       run: |
-        pytest --no-output
+        pytest
     - name: codecov
       uses: codecov/codecov-action@v1

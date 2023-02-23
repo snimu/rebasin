@@ -19,7 +19,7 @@ repos:
 
       - id: pytest
         name: pytest
-        entry: pytest --cov=src/rebasin --cov-report term-missing --durations=0
+        entry: pytest --cov=rebasin --cov-report term-missing --durations=0
         language: python
         types: [python]
         always_run: true
