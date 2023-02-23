@@ -1,0 +1,27 @@
+ci:
+  skip: [mypy, pytest]
+repos:
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.252
+    hooks:
+      - id: ruff
+        args: [ --fix, --exit-non-zero-on-fix ]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: python
+        types: [python]
+        require_serial: true
+
+      - id: pytest
+        name: pytest
+        entry: pytest --cov=src/rebasin --cov-report term-missing --durations=0
+        language: python
+        types: [python]
+        always_run: true
+        pass_filenames: false
+        verbose: true
