@@ -11,8 +11,8 @@ from .fixtures.models import MLP
 
 def test__init__() -> None:
     pcd = PermutationCoordinateDescent(
-        MLP(features=100, num_layers=5),
-        MLP(features=100, num_layers=5),
+        MLP(in_features=100, num_layers=5),
+        MLP(in_features=100, num_layers=5),
     )
 
     for (w1, w2), permutation in zip(pcd.weights, pcd.wperms, strict=True):
@@ -22,16 +22,16 @@ def test__init__() -> None:
 
 def test_coordinate_descent() -> None:
     pcd = PermutationCoordinateDescent(
-        MLP(features=10, num_layers=5),
-        MLP(features=10, num_layers=5),
+        MLP(in_features=10, num_layers=5),
+        MLP(in_features=10, num_layers=5),
     )
     pcd.coordinate_descent()
 
 
 def test_rebasin() -> None:
     pcd = PermutationCoordinateDescent(
-        MLP(features=10, num_layers=5),
-        MLP(features=10, num_layers=5),
+        MLP(in_features=10, num_layers=5),
+        MLP(in_features=10, num_layers=5),
     )
     pcd.coordinate_descent()
 
