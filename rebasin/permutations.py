@@ -32,6 +32,7 @@ class PermutationCoordinateDescent:
                 zip(self.model1.modules(), self.model2.modules(), strict=True)
         ):
             ident_str = "Both models must be identical except in their weight-values."
+
             if hasattr(module1, "weight"):
                 assert hasattr(module2, "weight"), ident_str
                 w1: torch.nn.Parameter = module1.weight  # type: ignore[assignment]
@@ -41,5 +42,8 @@ class PermutationCoordinateDescent:
                 perms.append(identity_tensor(w2))
                 weights.append((w1, w2))
                 windices.append(i)
+
+            if hasattr(module2, "weight"):
+                assert hasattr(module1, "weight"), ident_str
 
         return perms, weights, windices
