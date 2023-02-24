@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 
-from .math import identity_tensor
+from .util import identity_tensor
 
 
 class PermutationCoordinateDescent:

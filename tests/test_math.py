@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from rebasin.math import identity_tensor
+from rebasin.util import identity_tensor
 
 
 def test_identity_tensor() -> None:
