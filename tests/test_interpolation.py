@@ -41,5 +41,3 @@ def test_interpolation() -> None:
         verbose=True,
     )
     interp.interpolate(steps=5)
-    import warnings
-    warnings.warn(f"{interp.losses=}")
