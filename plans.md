@@ -32,7 +32,7 @@ converged = False
 
 while not converged:
     for path in rand_path_permutation(paths):
-        for module in path:
+        for module in rand_module_permutation(path):
             ...  # Update permutations
 ```
 
