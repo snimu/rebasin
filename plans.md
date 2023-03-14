@@ -51,6 +51,20 @@ into sub-paths / partial-paths that have only modules with broadcastable weights
 Why? Well it seems infeasible to me to develop permutations-matrices with the given 
 mathematical formulations that reach over, for example, `torch.nn.MaxPool`-layers. 
 
+### Plan
+
+1. Create paths through model using draw_graph(...).root_container
+    - The paths only contain Modules
+    - The Modules all have weights
+2. Attach a permutation matrix to each Module 
+    - Initialized as the identity Tensor
+    - Correct shape for weight and, if given, bias
+3. Split paths where two modules are not composable
+    - Composability found out by trying to multiply with permutation tensor
+    - W1 @ P0 @ W1.T  (is composable with previous module)
+    - W0 + W1.T @ P1 @ W1  (can be used as next module)
+4. Follow the algorithms in the paper using the paths that were calculated.
+
 ### I need a better concept of convergence
 
 Currently, I interpret convergence as no more change to the permutation matrices.
