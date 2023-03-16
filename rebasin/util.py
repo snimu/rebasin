@@ -12,9 +12,12 @@ def _init_identity(tensor: torch.Tensor, n_eye: int) -> torch.Tensor:
     return tensor
 
 
-def identity_tensor(tensor: torch.Tensor) -> torch.Tensor:
+def identity_tensor(tensor: torch.Tensor | torch.nn.Parameter) -> torch.Tensor:
     dims = list(tensor.size())
-    assert len(dims) >= 2, "Currently only works for tensors of dimension >= 2."
+
+    if len(dims) < 2:
+        return torch.tensor(1.0)
+
     n_eye = max(dims[-1], dims[-2])
     dims[-2], dims[-1] = n_eye, n_eye
 
