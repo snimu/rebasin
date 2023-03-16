@@ -8,6 +8,27 @@ from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
 
 class ModelPaths:
+    """
+    Find all paths through the model.
+
+    A path has the following properties:
+
+    - It consists of ModuleNodes.
+    - All its members have a "weight"-attribute.
+    - The weights of the modules in the path are composable.
+
+    Attributes:
+
+        id_module_map:
+            Map from id of ModuleNode to Module.
+        root:
+            Root node of the model.
+        base_paths:
+            All possible paths through the model consisting of ModuleNodes.
+        paths:
+            All paths through the model that have the properties above.
+            This is the main output of this class.
+    """
 
     def __init__(self, model: torch.nn.Module, input_data: Any) -> None:
         self.id_module_map = {
