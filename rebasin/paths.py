@@ -6,8 +6,6 @@ from typing import Any
 import torch
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
-from .util import identity_tensor
-
 
 class ModelPaths:
 
@@ -17,10 +15,6 @@ class ModelPaths:
             for module in model.modules()
             if hasattr(module, "weight")
             and isinstance(module.weight, (torch.Tensor, torch.nn.Parameter))
-        }
-        self.id_perm_map = {
-            id(module): identity_tensor(module.weight)  # type: ignore[arg-type]
-            for module in self.id_module_map.values()
         }
         self.root = draw_graph(model, input_data=input_data, depth=10000).root_container
         self.base_paths = self._base_paths(list(self.root), [], [])
