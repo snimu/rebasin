@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import Any
 
 import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
@@ -96,7 +96,9 @@ class PermutationCoordinateDescent:
         return num_to_id, id_to_module_node, id_to_permutation
 
     def _find_permutations(self) -> None:
-        """Permute the weights of the modules in model_b until the cost is minimized."""
+        """Find permutation tensors for the weights of model_b
+        until the cost is minimized. Here, the cost refers to
+        the difference between the weights of model_a and model_b."""
         cost = 1e12
         for _ in range(self.max_iter):
             cost_new = self._find_permutations_step()
@@ -121,7 +123,7 @@ class PermutationCoordinateDescent:
             # If there is no composable parent or child,
             #   then calculate the cost from the current module alone.
             # Otherwise, do the calculation using the parent and/or child.
-            cost_tensor = w_a1 @ (p1 @ w_b1.T)
+            cost_tensor = w_a1 @ (p1 @ w_b1.T)  # TODO: only calculate this if needed
             cost_tensor = w_a1 @ (p0 @ w_b1.T) if p0 is not None else cost_tensor
             cost_tensor += (
                 w_a2.T @ (p2 @ w_b2)
