@@ -16,7 +16,7 @@ def identity_tensor(tensor: torch.Tensor | torch.nn.Parameter) -> torch.Tensor:
     dims = list(tensor.size())
 
     if len(dims) < 2:
-        return torch.tensor(1.0)
+        return torch.ones_like(tensor)
 
     n_eye = max(dims[-1], dims[-2])
     dims[-2], dims[-1] = n_eye, n_eye
