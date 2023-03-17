@@ -22,15 +22,15 @@ class PermutationCoordinateDescent:
     ) -> None:
         self.max_iter = max_iter
 
-        root_a = draw_graph(model_a, input_data=input_data, depth=10000).root_container
-        root_b = draw_graph(model_b, input_data=input_data, depth=10000).root_container
-
         self.id_to_module_a = {id(module): module for module in model_a.modules()}
         self.id_to_module_b = {id(module): module for module in model_b.modules()}
 
+        root_a = draw_graph(model_a, input_data=input_data, depth=10000).root_container
         self.num_to_id_a, self.id_to_module_node_a, _ = (
             self._crawl_model(list(root_a), self.id_to_module_a, {}, {}, {}, 0)
         )
+
+        root_b = draw_graph(model_b, input_data=input_data, depth=10000).root_container
         self.num_to_id_b, self.id_to_module_node_b, self.id_to_permutation = (
             self._crawl_model(list(root_b), self.id_to_module_b, {}, {}, {}, 0)
         )
@@ -46,6 +46,28 @@ class PermutationCoordinateDescent:
             num_to_id: dict[int, int],
             num: int
     ) -> tuple[dict[int, int], dict[int, ModuleNode], dict[int, torch.Tensor]]:
+        """
+        Crawl the model graph and extract information.
+
+        Args:
+            nodes:
+                The nodes to crawl.
+            id_to_module:
+                A dictionary mapping module ids to modules.
+            id_to_module_node:
+                A dictionary mapping module ids to module nodes.
+            id_to_permutation:
+                A dictionary mapping module ids to permutation tensors.
+            num_to_id:
+                A dictionary mapping node numbers to module ids.
+                The purpose of this dictionary is to allow for and easy
+                use of random permutations.
+            num:
+                The current node number.
+
+        Returns:
+            Three dicts: num_to_id, id_to_module_node, and id_to_permutation.
+        """
         for node in nodes:
             if (
                     isinstance(node, ModuleNode)
@@ -99,15 +121,15 @@ class PermutationCoordinateDescent:
             # If there is no composable parent or child,
             #   then calculate the cost from the current module alone.
             # Otherwise, do the calculation using the parent and/or child.
-            A = w_a1 @ (p1 @ w_b1.T)
-            A = w_a1 @ (p0 @ w_b1.T) if p0 is not None else A
-            A += (
+            cost_tensor = w_a1 @ (p1 @ w_b1.T)
+            cost_tensor = w_a1 @ (p0 @ w_b1.T) if p0 is not None else cost_tensor
+            cost_tensor += (
                 w_a2.T @ (p2 @ w_b2)
                 if p2 is not None and w_a2 is not None and w_b2 is not None
-                else torch.zeros_like(A)
+                else torch.zeros_like(cost_tensor)
             )
 
-            ri, ci = linear_sum_assignment(A.detach().numpy(), maximize=True)
+            ri, ci = linear_sum_assignment(cost_tensor.detach().numpy(), maximize=True)
 
             # The rows should not change, only the columns.
             assert (torch.tensor(ri) == torch.arange(len(ri))).all()
@@ -115,17 +137,17 @@ class PermutationCoordinateDescent:
             # Permute
             self.id_to_permutation[id_b] = p1[ci]
 
-            cost += self._calculate_cost(A)
+            cost += self._calculate_cost(cost_tensor)
 
         cost /= len(self.num_to_id_a)
         return cost
 
     @staticmethod
-    def _calculate_cost(A: torch.Tensor) -> float:
+    def _calculate_cost(cost_tensor: torch.Tensor) -> float:
         # The cost is calculated differently in the repo to the paper.
         # I don't understand how it calculated, however, so for now,
-        #  I'm just using the Frobenius norm.
-        return torch.sqrt(A * A).sum().item()
+        #  I'm just using the Frobenius norm of the cost matrix.
+        return torch.frobenius_norm(cost_tensor).item()
 
     def _find_parent(  # type: ignore[empty-body]
             self,
