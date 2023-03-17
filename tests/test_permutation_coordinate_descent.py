@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-
 import torch
 
 from rebasin import PermutationCoordinateDescent
@@ -9,46 +7,26 @@ from rebasin import PermutationCoordinateDescent
 from .fixtures.models import MLP
 
 
-def test__init__() -> None:
-    pcd = PermutationCoordinateDescent(
-        MLP(in_features=100, num_layers=5),
-        MLP(in_features=100, num_layers=5),
-    )
+def test_permutation_coordinate_descent_mlp() -> None:
+    model_a = MLP(5)
+    model_b = MLP(5)
+    input_data = torch.randn(5)
+    pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
+    modules_a = [module for module in model_a.modules() if hasattr(module, "weight")]
+    modules_b = [module for module in model_b.modules() if hasattr(module, "weight")]
 
-    for (w1, w2), permutation in zip(pcd.weights, pcd.wperms, strict=True):
-        assert torch.all(w1 == w1 @ permutation)
-        assert torch.all(w2 == w2 @ permutation)
+    for module in modules_a:
+        assert module in pcd.id_to_module_a.values()
 
+    for module in modules_b:
+        assert module in pcd.id_to_module_b.values()
 
-def test_coordinate_descent() -> None:
-    pcd = PermutationCoordinateDescent(
-        MLP(in_features=10, num_layers=5),
-        MLP(in_features=10, num_layers=5),
-    )
-    pcd.coordinate_descent()
+    assert len(pcd.id_to_module_a) == len(pcd.id_to_module_b)
+    assert len(pcd.id_to_module_node_a) == len(pcd.id_to_module_node_b)
+    assert len(pcd.id_to_permutation_a) == len(pcd.id_to_permutation_b)
+    assert len(pcd.num_to_id_a) == len(pcd.num_to_id_b)
 
-
-def test_rebasin() -> None:
-    pcd = PermutationCoordinateDescent(
-        MLP(in_features=10, num_layers=5),
-        MLP(in_features=10, num_layers=5),
-    )
-    pcd.coordinate_descent()
-
-    old_weights = []
-    for module in pcd.model2.modules():
-        if hasattr(module, "weight"):
-            old_weights.append(copy.deepcopy(module.weight))
-
-    pcd.rebasin()
-
-    new_weights = []
-    for module in pcd.model2.modules():
-        if hasattr(module, "weight"):
-            new_weights.append(module.weight)
-
-    diff_acc = 0.0
-    for ow, nw in zip(old_weights, new_weights, strict=True):
-        diff_acc += float((ow - nw).abs().sum())  # type: ignore[operator]
-
-    assert diff_acc > 0.0
+    # pcd.id_to_module_a/b can be longer than the other dicts
+    #   because it contains all modules, not just the ones with weights.
+    assert len(pcd.num_to_id_a) == len(pcd.id_to_module_node_a)
+    assert len(pcd.num_to_id_a) == len(pcd.id_to_permutation_a)
