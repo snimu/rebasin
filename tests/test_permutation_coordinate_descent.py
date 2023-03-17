@@ -23,10 +23,9 @@ def test_permutation_coordinate_descent_mlp() -> None:
 
     assert len(pcd.id_to_module_a) == len(pcd.id_to_module_b)
     assert len(pcd.id_to_module_node_a) == len(pcd.id_to_module_node_b)
-    assert len(pcd.id_to_permutation_a) == len(pcd.id_to_permutation_b)
     assert len(pcd.num_to_id_a) == len(pcd.num_to_id_b)
 
     # pcd.id_to_module_a/b can be longer than the other dicts
     #   because it contains all modules, not just the ones with weights.
     assert len(pcd.num_to_id_a) == len(pcd.id_to_module_node_a)
-    assert len(pcd.num_to_id_a) == len(pcd.id_to_permutation_a)
+    assert len(pcd.num_to_id_a) == len(pcd.id_to_permutation)
