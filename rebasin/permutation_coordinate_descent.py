@@ -147,8 +147,9 @@ class PermutationCoordinateDescent:
     @staticmethod
     def _calculate_cost(cost_tensor: torch.Tensor) -> float:
         # The cost is calculated differently in the repo to the paper.
-        # I don't understand how it calculated, however, so for now,
-        #  I'm just using the Frobenius norm of the cost matrix.
+        # I don't understand how or what it means, however, so for now,
+        #   I'm just using the Frobenius norm of the cost matrix,
+        #   which is the same as the sum of the absolute values of the elements.
         return torch.frobenius_norm(cost_tensor).item()
 
     def _find_parent(  # type: ignore[empty-body]
