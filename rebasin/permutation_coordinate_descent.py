@@ -26,18 +26,23 @@ class PermutationCoordinateDescent:
         self.id_to_module_b = {id(module): module for module in model_b.modules()}
 
         root_a = draw_graph(model_a, input_data=input_data, depth=10000).root_container
-        self.num_to_id_a, self.id_to_module_node_a, _ = (
-            self._crawl_model(list(root_a), self.id_to_module_a, {}, {}, {}, 0)
-        )
+        self.num_to_id_a, self.id_to_module_node_a, _ = \
+            self._crawl_model(list(root_a), self.id_to_module_a)
 
         root_b = draw_graph(model_b, input_data=input_data, depth=10000).root_container
-        self.num_to_id_b, self.id_to_module_node_b, self.id_to_permutation = (
-            self._crawl_model(list(root_b), self.id_to_module_b, {}, {}, {}, 0)
-        )
+        self.num_to_id_b, self.id_to_module_node_b, self.id_to_permutation = \
+            self._crawl_model(list(root_b), self.id_to_module_b)
 
         # self._find_permutations()
 
     def _crawl_model(
+            self, root: list[NODE_TYPES], id_to_module: dict[int, torch.nn.Module]
+    ) -> tuple[dict[int, int], dict[int, ModuleNode], dict[int, torch.Tensor]]:
+        _, num_to_id, id_to_module_node, id_to_permutation = \
+            self._crawl_model_recursive(root, id_to_module, {}, {}, {}, 0)
+        return num_to_id, id_to_module_node, id_to_permutation
+
+    def _crawl_model_recursive(
             self,
             nodes: list[NODE_TYPES],
             id_to_module: dict[int, torch.nn.Module],
@@ -45,7 +50,7 @@ class PermutationCoordinateDescent:
             id_to_permutation: dict[int, torch.Tensor],
             num_to_id: dict[int, int],
             num: int
-    ) -> tuple[dict[int, int], dict[int, ModuleNode], dict[int, torch.Tensor]]:
+    ) -> tuple[int, dict[int, int], dict[int, ModuleNode], dict[int, torch.Tensor]]:
         """
         Crawl the model graph and extract information.
 
@@ -66,7 +71,8 @@ class PermutationCoordinateDescent:
                 The current node number.
 
         Returns:
-            Three dicts: num_to_id, id_to_module_node, and id_to_permutation.
+            The current Module-number
+            and three dicts: num_to_id, id_to_module_node, and id_to_permutation.
         """
         for node in nodes:
             if (
@@ -84,16 +90,17 @@ class PermutationCoordinateDescent:
 
             children = list(node.children)
             if children:
-                num_to_id, id_to_module_node, id_to_permutation = self._crawl_model(
-                    children,  # type: ignore[arg-type]
-                    id_to_module,
-                    id_to_module_node,
-                    id_to_permutation,
-                    num_to_id,
-                    num
-                )
+                num, num_to_id, id_to_module_node, id_to_permutation = \
+                    self._crawl_model_recursive(
+                        children,  # type: ignore[arg-type]
+                        id_to_module,
+                        id_to_module_node,
+                        id_to_permutation,
+                        num_to_id,
+                        num
+                    )
 
-        return num_to_id, id_to_module_node, id_to_permutation
+        return num, num_to_id, id_to_module_node, id_to_permutation
 
     def _find_permutations(self) -> None:
         """Find permutation tensors for the weights of model_b
