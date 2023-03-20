@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
-
-from .util import identity_tensor
 
 NODE_TYPES = FunctionNode | ModuleNode | TensorNode
 
@@ -77,14 +76,23 @@ class PermutationCoordinateDescent:
         for node in nodes:
             if (
                     isinstance(node, ModuleNode)
-                    and hasattr(id_to_module.get(node.compute_unit_id), "weight")
                     and node.compute_unit_id not in id_to_module_node.keys()
+                    and hasattr(id_to_module.get(node.compute_unit_id), "weight")
+                    and len(id_to_module.get(  # type: ignore[arg-type]
+                        node.compute_unit_id).weight.shape  # type: ignore[union-attr]
+                    ) > 0
             ):
                 id_to_module_node[node.compute_unit_id] = node
                 num_to_id[num] = node.compute_unit_id
-                id_to_permutation[node.compute_unit_id] = identity_tensor(
-                    id_to_module.get(node.compute_unit_id)  # type: ignore[arg-type]
-                    .weight  # type: ignore[union-attr]
+
+                module = id_to_module.get(node.compute_unit_id)
+                assert module is not None and module.weight is not None
+                assert isinstance(module.weight.shape, torch.Size)
+
+                id_to_permutation[node.compute_unit_id] = (
+                    torch.arange(module.weight.shape[-2])
+                    if len(module.weight.shape) > 1
+                    else torch.arange(module.weight.shape[0])
                 )
                 num += 1
 
@@ -120,31 +128,37 @@ class PermutationCoordinateDescent:
             id_a = self.num_to_id_a[num.item()]
             id_b = self.num_to_id_b[num.item()]
 
-            p1 = self.id_to_permutation[id_b]
+            id_child_a: int = ...  # type: ignore[assignment]
+            id_child_b: int = ...  # type: ignore[assignment]
+            id_parent_b: int = ...  # type: ignore[assignment]
+
             w_a1 = self.id_to_module_a[id_a].weight
-            w_b1 = self.id_to_module_b[id_b].weight
-
-            _, _, p0 = self._find_parent(id_a, id_b)
-            w_a2, w_b2, p2 = self._find_child(id_a, id_b)
-
-            # If there is no composable parent or child,
-            #   then calculate the cost from the current module alone.
-            # Otherwise, do the calculation using the parent and/or child.
-            cost_tensor = w_a1 @ (p1 @ w_b1.T)  # TODO: only calculate this if needed
-            cost_tensor = w_a1 @ (p0 @ w_b1.T) if p0 is not None else cost_tensor
-            cost_tensor += (
-                w_a2.T @ (p2 @ w_b2)
-                if p2 is not None and w_a2 is not None and w_b2 is not None
-                else torch.zeros_like(cost_tensor)
+            w_b1 = (
+                self._permuted_weight(weight_id=id_b, perm_id=id_b)
+                if id_parent_b is None
+                else self._permuted_weight(weight_id=id_b, perm_id=id_parent_b)
             )
+
+            w_a2 = (
+                self.id_to_module_a[id_child_a].weight
+                if id_child_a is not None else None
+            )
+            w_b2 = (
+                self._permuted_weight(weight_id=id_child_b, perm_id=id_child_b)
+                if id_child_b is not None else None
+            )
+
+            cost_tensor = w_a1 @ w_b1.T
+            cost_tensor += \
+                w_a2.T @ w_b2 if w_a2 is not None and w_b2 is not None else 0.0
 
             ri, ci = linear_sum_assignment(cost_tensor.detach().numpy(), maximize=True)
 
             # The rows should not change, only the columns.
             assert (torch.tensor(ri) == torch.arange(len(ri))).all()
 
-            # Permute
-            self.id_to_permutation[id_b] = p1[ci]
+            # Update permutation
+            self.id_to_permutation[id_b] = self.id_to_permutation[id_b][ci]
 
             cost += self._calculate_cost(cost_tensor)
 
@@ -155,32 +169,23 @@ class PermutationCoordinateDescent:
     def _calculate_cost(cost_tensor: torch.Tensor) -> float:
         # The cost is calculated differently in the repo to the paper.
         # I don't understand how or what it means, however, so for now,
-        #   I'm just using the Frobenius norm of the cost matrix,
+        #   I'm just using the Frobenius norm of the cost matrix
         #   (sum of absolute values of the elements).
         # Will experiment and see if it works like this.
         # TODO: figure out what the cost is supposed to be
         return torch.frobenius_norm(cost_tensor).item()
 
-    def _find_parent(  # type: ignore[empty-body]
-            self,
-            id_a: int,
-            id_b: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[None, None, None]:
-        """Find a parent for each of the two modules.
+    def _permuted_weight(
+            self, weight_id: int, perm_id: int
+    ) -> torch.Tensor | torch.nn.Parameter:
+        """Permute the weight of a module."""
+        weight = self.id_to_module_b[weight_id].weight
+        assert weight is not None
+        assert isinstance(weight.shape, torch.Size)
 
-        The parent should be a module that is composable with the module.
-        """
-        pass  # TODO
+        perm_weight = copy.deepcopy(weight)
+        perm_col = self.id_to_permutation[perm_id]
 
-    def _find_child(  # type: ignore[empty-body]
-            self,
-            id_a: int,
-            id_b: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[None, None, None]:
-        """Find a child for each of the two modules.
-
-        The child should be a module that is composable with the module.
-        """
-        pass  # TODO
-
-
+        perm_index = -1 if len(weight.shape) > 1 else 0
+        perm_weight[perm_index] = perm_weight[perm_index][perm_col]
+        return perm_weight
