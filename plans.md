@@ -6,12 +6,33 @@
   - Is more readable
   - **TODO**: Figure out how to use this to calculate the permutations
 - Find parents / children:
-  1. Find all parents / children
-  2. Filter out parents / children that are not composable
-  3. Save the result in a `dict[id, list[id]]`
+    1. Find all parents / children
+    2. Filter out parents / children that are not composable
+    3. Save the result in a `dict[id, list[id]]`
 - In the permutation loop: use one function 
   to extract the weights and permutation columns
   from the parents / children
+
+Things to understand: 
+
+- The loss:
+
+```python
+oldL = torch.einsum('ij,ij->i', A, torch.eye(n)[perm[p].long()]).sum()
+newL = torch.einsum('ij,ij->i', A,torch.eye(n)[ci, :]).sum()
+progress = progress or newL > oldL + 1e-12
+```
+
+- The permutation (`get_permuted_param`). Specifically, 
+  why are the tensors reshaped as they are, and how does the 
+  permutation even work if `ci` is calculated on the reshaped tensors
+  but is applied to the original tensors?
+- Is there a general way to find out which axes to permute 
+  independent of the `Module` type? Or do I have to find that out
+  for every `Module` type and create a `dict` that saves that info?
+  Or maybe its own class. That could save the module id, the weight & bias,
+  the permutation columns, and the axis along which to permute.
+
 
 ## `PermuteColumns`
 
