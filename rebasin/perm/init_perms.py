@@ -34,6 +34,9 @@ class PermutationInitializer:
             permutations: list[Permutation],
             id_to_permutation: dict[int, list[Permutation]],
     ) -> tuple[list[Permutation], dict[int, list[Permutation]]]:
+        if not nodes:
+            return permutations, id_to_permutation
+
         for node in nodes:
             children: list[NODE_TYPES] = list(node.children)  # type: ignore[arg-type]
 
