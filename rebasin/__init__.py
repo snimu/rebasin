@@ -1,2 +1,1 @@
 from .interpolation import Interpolation
-from .permutation_coordinate_descent import PermutationCoordinateDescent
