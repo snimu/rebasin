@@ -25,6 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install mypy pytest pytest-cov tqdm
         pip install torch==${{ matrix.pytorch-version }}
+        pip install torchvision
     - name: mypy
       if: ${{ matrix.pytorch-version == '1.13' }}
       run: |
