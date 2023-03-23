@@ -12,6 +12,15 @@ from .structs import MODULE_AXES, AppliesTo, AxisInfo, Permutation
 NODE_TYPES = FunctionNode | ModuleNode | TensorNode
 
 
+# TODO: find corresponding modules of model_a --- this here is just for model_b
+#       might be called "permuted_model" and "comparison_model".
+#   Idea: make list of ids for model_b, then crawl model_a and at each step,
+#       add the module of model_a to the permutations at the corresponding
+#       index in the list of ids.
+
+# TODO: Fuse permutations of multiple modules into one permutation
+#       (mod + parents & children).
+
 class PermutationInitializer:
     def __init__(self, model: nn.Module, input_data: Any) -> None:
         self.id_to_module = {id(module): module for module in model.modules()}
