@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 
-def progress(
+def calculate_progress(
         cost_mat: torch.Tensor, perm_old: torch.Tensor, perm_new: torch.Tensor
 ) -> bool:
     """
@@ -38,6 +38,6 @@ def progress(
     optimality_old = torch.einsum("ij,ij->i", cost_mat[:, perm_old], eye_).sum()
     optimality_new = torch.einsum("ij,ij->i", cost_mat[:, perm_new], eye_).sum()
 
-    prog = optimality_new.item() > optimality_old.item() + 1e-12
-    return prog
+    progress = optimality_new.item() > optimality_old.item() + 1e-12
+    return progress
 
