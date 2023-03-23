@@ -11,11 +11,11 @@ def progress(
 
     Args:
         cost_mat:
-            The cost matrix. A nxn matrix.
+            The cost matrix. Shape: (n, n).
         perm_old:
-            The old permutation. A vector of size n.
+            The old permutation. Shape: (n,).
         perm_new:
-            The new permutation. A vector of size n.
+            The new permutation. Shape: (n,).
 
     Returns:
         True if the new permutation moves the cost matrix closer to the identity matrix
