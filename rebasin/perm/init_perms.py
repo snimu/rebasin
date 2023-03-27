@@ -19,15 +19,21 @@ class PermutationInitializer:
         self.input_data = input_data
 
         # A permutation for each axis of the weight (and bias) of each module.
-        self.permutations_init, self.id_to_permutation = \
+        self.permutations_init, self.id_to_permutation_init = \
             self._initialize_permutations(model_a, model_b)
 
         # The final permutations after merging permutations.
         self.permutations: list[Permutation] = []
-        # Discover redundant permutations to remove in the end.
+
+        # Discover redundant permutations to remove.
         self.redundant_permutation_indices: list[int] = []
         self._merge_permutations()
         self._remove_redundant_permutations()
+
+        # The mapping of Module-IDs to permutations.
+        # Used to permute a specific module along every axis.
+        self.id_to_permutation: dict[int, list[Permutation]] = {}
+        self._map_module_id_to_permutations()
 
     def _initialize_permutations(
             self, model_a: nn.Module, model_b: nn.Module
@@ -182,7 +188,7 @@ class PermutationInitializer:
             if node in visited_nodes:
                 continue
 
-            permutations = self.id_to_permutation.get(node.compute_unit_id)
+            permutations = self.id_to_permutation_init.get(node.compute_unit_id)
             if permutations is None:
                 self._merge_permutations_recursive(
                     children, visited_nodes  # type: ignore[arg-type]
@@ -205,9 +211,9 @@ class PermutationInitializer:
         for parent in node.parents:
             if (
                     isinstance(parent, ModuleNode)
-                    and parent.compute_unit_id in self.id_to_permutation
+                    and parent.compute_unit_id in self.id_to_permutation_init
             ):
-                parent_modules.extend(self.id_to_permutation[parent.compute_unit_id])
+                parent_modules.extend(self.id_to_permutation_init[parent.compute_unit_id])
             else:
                 parent_modules.extend(
                     self._get_parent_modules(parent)  # type: ignore[arg-type]
@@ -282,3 +288,13 @@ class PermutationInitializer:
         self.redundant_permutation_indices.sort(reverse=True)
         for i in self.redundant_permutation_indices:
             self.permutations.pop(i)
+
+    def _map_module_id_to_permutations(self) -> None:
+        """Map module ids to permutations."""
+        for permutation in self.permutations:
+            for module_info in permutation.modules:
+                id_ = id(module_info.module_b)
+                if id_ in self.id_to_permutation:
+                    self.id_to_permutation[id_].append(permutation)
+                else:
+                    self.id_to_permutation[id_] = [permutation]

@@ -68,3 +68,15 @@ def common_init_tests(model_b: nn.Module, perm_init: PermutationInitializer) -> 
             for p in perm_init.permutations
             for mi in p.modules
         )
+
+    # Every module id that is in perm_init.id_to_permutation_init
+    #   should be in perm_init.id_to_permutation
+    assert all(
+        id_ in perm_init.id_to_permutation
+        for id_ in perm_init.id_to_permutation_init
+    )
+
+    # Every id in perm_init.id_to_permutation
+    #   should correspond to a module in modules
+    ids = [id(m) for m in modules]
+    assert all(id_ in ids for id_ in perm_init.id_to_permutation)
