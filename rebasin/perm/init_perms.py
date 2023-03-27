@@ -1,179 +1,284 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import copy
 from typing import Any
 
 import torch
 from torch import nn
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
-from .structs import MODULE_AXES, AppliesTo, AxisInfo, Permutation
+from .structs import MODULE_AXES, AppliesTo, AxisInfo, ModuleInfo, Permutation
 
 NODE_TYPES = FunctionNode | ModuleNode | TensorNode
 
 
-# TODO: find corresponding modules of model_a --- this here is just for model_b
-#       might be called "permuted_model" and "comparison_model".
-#   Idea: make list of ids for model_b, then crawl model_a and at each step,
-#       add the module of model_a to the permutations at the corresponding
-#       index in the list of ids.
-
-# TODO: Fuse permutations of multiple modules into one permutation
-#       (mod + parents & children).
-
 class PermutationInitializer:
-    def __init__(self, model: nn.Module, input_data: Any) -> None:
-        self.id_to_module = {id(module): module for module in model.modules()}
+    def __init__(self, model_a: nn.Module, model_b: nn.Module, input_data: Any) -> None:
+        self.model_a = model_a
+        self.model_b = model_b
+        self.input_data = input_data
 
-        self.permutations, self.id_to_permutation = \
-            self._init_permutations(model, input_data)
-        self._find_parents_children()
+        # A permutation for each axis of the weight (and bias) of each module.
+        self.permutations_init, self.id_to_permutation = \
+            self._initialize_permutations(model_a, model_b)
 
-    def _init_permutations(
-            self, model: nn.Module, input_data: Any
+        # The final permutations after merging permutations.
+        self.permutations: list[Permutation] = []
+        # Discover redundant permutations to remove in the end.
+        self.redundant_permutation_indices: list[int] = []
+        self._merge_permutations()
+        self._remove_redundant_permutations()
+
+    def _initialize_permutations(
+            self, model_a: nn.Module, model_b: nn.Module
     ) -> tuple[list[Permutation], dict[int, list[Permutation]]]:
-        root = list(draw_graph(model, input_data=input_data, depth=1e12).root_container)
-        return self._init_permutations_recursive(
-            root, permutations=[], id_to_permutation={}
-        )
+        permutations: list[Permutation] = []
+        id_to_permutation: dict[int, list[Permutation]] = {}
 
-    def _init_permutations_recursive(
-            self,
-            nodes: Sequence[NODE_TYPES],
-            permutations: list[Permutation],
-            id_to_permutation: dict[int, list[Permutation]],
-    ) -> tuple[list[Permutation], dict[int, list[Permutation]]]:
-        if not nodes:
-            return permutations, id_to_permutation
+        for module_a, module_b in zip(
+                model_a.modules(), model_b.modules(), strict=True
+        ):
+            assert type(module_a) == type(module_b), \
+                "Failure in rebasin: Found modules of different types."
 
-        for node in nodes:
-            children: list[NODE_TYPES] = list(node.children)  # type: ignore[arg-type]
+            if not hasattr(module_b, "weight"):
+                continue
 
-            if not isinstance(node, ModuleNode):
-                permutations, id_to_permutation = self._init_permutations_recursive(
-                    children, permutations, id_to_permutation
-                )
-                continue  # Only consider Modules, not Functions or Tensors
+            if module_b.weight is None:
+                continue
 
-            module = self.id_to_module.get(node.compute_unit_id)
-            assert module is not None, \
-                "Failure in torchview: Found module with id that is not in model."
+            assert hasattr(module_a, "weight"), \
+                "Failure in rebasin: Found modules with different properties."
 
-            if not hasattr(module, "weight"):
-                permutations, id_to_permutation = self._init_permutations_recursive(
-                    children, permutations, id_to_permutation
-                )
-                continue  # permute weights only
+            if not isinstance(module_a.weight, (torch.Tensor, nn.Parameter)):
+                continue
+            if not isinstance(module_b.weight, (torch.Tensor, nn.Parameter)):
+                continue
 
-            if module.weight is None:
-                permutations, id_to_permutation = self._init_permutations_recursive(
-                    children, permutations, id_to_permutation
-                )
-                continue  # cannot permute None
+            assert isinstance(module_a.weight.shape, torch.Size)
+            assert isinstance(module_b.weight.shape, torch.Size)
 
-            assert isinstance(module.weight.shape, torch.Size)
+            if len(module_b.weight.shape) == 0:
+                continue  # cannot permute scalars
 
-            if len(module.weight.shape) == 0:
-                permutations, id_to_permutation = self._init_permutations_recursive(
-                    children, permutations, id_to_permutation
-                )
-                continue  # cannot permute a scalar
-
-            axes = MODULE_AXES.get(type(module))
+            axes = MODULE_AXES.get(type(module_b))
             if axes is None:
-                permutations, id_to_permutation = self._init_permutations_recursive(
-                    children, permutations, id_to_permutation
-                )
                 continue  # unknown module type
 
             # Init permutations
-            permutations, id_to_permutation = self._init_permutations_step(
-                axes, module, node, permutations, id_to_permutation
-            )
+            perms = self._init_mod_perm(module_a, module_b, axes)
+            permutations.extend(perms)
+            id_to_permutation[id(module_b)] = perms
 
         return permutations, id_to_permutation
 
-    @staticmethod
-    def _init_permutations_step(
-            axes: AxisInfo,
-            module: nn.Module,
-            node: ModuleNode,
-            permutations: list[Permutation],
-            id_to_permutation: dict[int, list[Permutation]]
-    ) -> tuple[list[Permutation], dict[int, list[Permutation]]]:
-        for w_ax in axes.weight_axes:
+    def _init_mod_perm(
+            self, module_a: nn.Module, module_b: nn.Module, axes: AxisInfo
+    ) -> list[Permutation]:
+        perms: list[Permutation] = []
+
+        for wax in range(axes.num_axis):
             if (
-                    w_ax != axes.bias_axis
-                    or not hasattr(module, "bias")
-                    or module.bias is None
-                    or len(module.bias.shape) == 0  # type: ignore[arg-type]
+                    wax != axes.bax
+                    or not hasattr(module_b, "bias")
+                    or module_b.bias is None
+                    or len(module_b.bias.shape) == 0  # type: ignore[arg-type]
             ):
-                assert isinstance(module.weight.shape, torch.Size)  # satisfy mypy
+                assert isinstance(module_b.weight.shape, torch.Size)  # satisfy mypy
 
                 # Permute weight only
-                permutation = Permutation(
-                    perm_indices=torch.arange(module.weight.shape[w_ax]),
-                    axis=w_ax,
+                module_info = ModuleInfo(
+                    module_b=module_b,
+                    module_a=module_a,
+                    axis=wax,
                     applies_to=AppliesTo.WEIGHT,
-                    module=module,
-                    node=node,
-                    parents=[],
-                    children=[],
+                    axis_info=axes
                 )
-                permutations.append(permutation)
-                id_to_permutation[node.compute_unit_id] = [permutation]
+                permutation = Permutation(
+                    perm_indices=torch.arange(module_b.weight.shape[wax]),
+                    modules=[module_info],
+                )
+                perms.append(permutation)
 
-            # bias_axis denotes the weight_axis that the bias corresponds to,
-            #   not the axis of the bias itself. It is assumed that the bias
-            #   is one-dimensional.
-            # Therefore, the weight shape at w_ax
-            #   must be compared with the bias shape at 0.
+                # axes.bax denotes the weight axis that the bias corresponds to,
+                #   not the axis of the bias itself. It is assumed that the bias
+                #   is one-dimensional.
+                # Therefore, the weight shape at wax
+                #   must be compared with the bias shape at 0.
             elif (
-                    module.weight.shape[w_ax]  # type: ignore[index]
-                    == module.bias.shape[0]  # type: ignore[index]
+                    module_b.weight.shape[wax]  # type: ignore[index]
+                    == module_b.bias.shape[0]  # type: ignore[index]
             ):
-                assert isinstance(module.weight.shape, torch.Size)  # satisfy mypy
+                assert isinstance(module_b.weight.shape, torch.Size)  # satisfy mypy
 
                 # Permutes both weight and bias
-                permutation = Permutation(
-                    perm_indices=torch.arange(module.weight.shape[w_ax]),
-                    axis=w_ax,
+                module_info = ModuleInfo(
+                    module_b=module_b,
+                    module_a=module_a,
+                    axis=wax,
                     applies_to=AppliesTo.BOTH,
-                    module=module,
-                    node=node,
-                    parents=[],
-                    children=[],
+                    axis_info=axes
                 )
-                permutations.append(permutation)
-                id_to_permutation[node.compute_unit_id] = [permutation]
-            else:  # w_ax == axes.bias_axis and module.bias exists and is not None
-                assert isinstance(module.weight.shape, torch.Size)  # satisfy mypy
-                assert isinstance(module.bias.shape, torch.Size)  # satisfy mypy
+
+                permutation = Permutation(
+                    perm_indices=torch.arange(module_b.weight.shape[wax]),
+                    modules=[module_info],
+                )
+                perms.append(permutation)
+            else:
+                # wax == axes.bax and module.bias exists and is not None
+                #   but the weight and bias shapes do not match.
+                # This can happen in transposed convolutions, for example.
+                assert isinstance(module_b.weight.shape, torch.Size)  # satisfy mypy
+                assert isinstance(module_b.bias.shape, torch.Size)  # satisfy mypy
 
                 # Independently permute weight and bias
-                permutation_weight = Permutation(
-                    perm_indices=torch.arange(module.weight.shape[w_ax]),
-                    axis=w_ax,
+                winfo = ModuleInfo(
+                    module_b=module_b,
+                    module_a=module_a,
+                    axis=wax,
                     applies_to=AppliesTo.WEIGHT,
-                    module=module,
-                    node=node,
-                    parents=[],
-                    children=[],
+                    axis_info=axes
+                )
+                permutation_weight = Permutation(
+                    perm_indices=torch.arange(module_b.weight.shape[wax]),
+                    modules=[winfo]
+                )
+
+                binfo = ModuleInfo(
+                    module_b=module_b,
+                    module_a=module_a,
+                    axis=wax,
+                    applies_to=AppliesTo.BIAS,
+                    axis_info=axes
                 )
                 permutation_bias = Permutation(
-                    perm_indices=torch.arange(module.bias.shape[0]),
-                    axis=0,
-                    applies_to=AppliesTo.BIAS,
-                    module=module,
-                    node=node,
-                    parents=[],
-                    children=[],
+                    perm_indices=torch.arange(module_b.bias.shape[0]),
+                    modules=[binfo]
                 )
-                permutations.extend([permutation_weight, permutation_bias])
-                id_to_permutation[node.compute_unit_id] = \
-                    [permutation_weight, permutation_bias]
+                perms.extend([permutation_weight, permutation_bias])
 
-        return permutations, id_to_permutation
+        return perms
 
-    def _find_parents_children(self) -> None:
+    def _merge_permutations(self) -> None:
         """Update the permutations with their parents & children."""
+        root_nodes = list(
+            draw_graph(self.model_b, self.input_data, depth=1e12).root_container
+        )
+        self._merge_permutations_recursive(root_nodes, set())  # type: ignore[arg-type]
+
+    def _merge_permutations_recursive(
+            self, nodes: list[NODE_TYPES], visited_nodes: set[NODE_TYPES]
+    ) -> None:
+        for node in nodes:
+            children = list(node.children)
+
+            if not isinstance(node, ModuleNode):
+                self._merge_permutations_recursive(
+                    children, visited_nodes  # type: ignore[arg-type]
+                )
+                continue
+
+            if node in visited_nodes:
+                continue
+
+            permutations = self.id_to_permutation.get(node.compute_unit_id)
+            if permutations is None:
+                self._merge_permutations_recursive(
+                    children, visited_nodes  # type: ignore[arg-type]
+                )
+                continue
+
+            visited_nodes.add(node)
+            parent_modules = self._get_parent_modules(node)
+
+            for permutation in permutations:
+                self._merge(parent_modules, permutation)
+
+            self._merge_permutations_recursive(
+                children, visited_nodes  # type: ignore[arg-type]
+            )
+
+    def _get_parent_modules(self, node: NODE_TYPES) -> list[Permutation]:
+        """Get the permutations of the parent modules of a node."""
+        parent_modules = []
+        for parent in node.parents:
+            if (
+                    isinstance(parent, ModuleNode)
+                    and parent.compute_unit_id in self.id_to_permutation
+            ):
+                parent_modules.extend(self.id_to_permutation[parent.compute_unit_id])
+            else:
+                parent_modules.extend(
+                    self._get_parent_modules(parent)  # type: ignore[arg-type]
+                )
+        return parent_modules
+
+    def _merge(
+            self, parent_modules: list[Permutation], permutation: Permutation
+    ) -> None:
+        """Merge one permutation with its parents if they fit."""
+        new_permutation = Permutation(
+            perm_indices=permutation.perm_indices,
+            modules=permutation.modules,
+        )
+
+        perm_info = permutation.modules[0]
+
+        for parent in parent_modules:
+            if parent.perm_indices.shape != permutation.perm_indices.shape:
+                continue
+
+            # Compare last weight in parents with first in current permutation.
+            parent_info = parent.modules[-1]
+
+            if (
+                    perm_info.axis == perm_info.axis_info.wax_in
+                    and parent_info.axis == perm_info.axis_info.wax_out
+            ):
+                # Merge weight permutation. Preserve correct order.
+                new_modules = copy.copy(parent.modules)
+                new_modules.extend(permutation.modules)
+                new_permutation.modules = new_modules
+
+        # Don't add permutations that are subsets of other permutations.
+        if self._all_modules_contained_in_other_permutation(new_permutation):
+            return
+
+        # If the new permutation is a superset of another permutation,
+        #   remove the other permutation.
+        redundant_permutation = \
+            self._get_subset_permutation(new_permutation)
+        if redundant_permutation is not None:
+            self.redundant_permutation_indices.append(redundant_permutation)
+
+        # Add the new permutation to permutations.
+        self.permutations.append(new_permutation)
+
+    def _all_modules_contained_in_other_permutation(
+            self, permutation: Permutation
+    ) -> bool:
+        """Check if all modules in a permutation are contained in another."""
+        for other_permutation in self.permutations:
+            if all(
+                    module in other_permutation.modules
+                    for module in permutation.modules
+            ):
+                return True
+        return False
+
+    def _get_subset_permutation(self, permutation: Permutation) -> int | None:
+        """Check if a permutation is a subset of another."""
+        for i, other_permutation in enumerate(self.permutations):
+            if all(
+                    module in permutation.modules
+                    for module in other_permutation.modules
+            ):
+                return i
+        return None
+
+    def _remove_redundant_permutations(self) -> None:
+        """Remove redundant permutations."""
+        self.redundant_permutation_indices.sort(reverse=True)
+        for i in self.redundant_permutation_indices:
+            self.permutations.pop(i)
