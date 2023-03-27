@@ -59,3 +59,12 @@ def common_init_tests(model_b: nn.Module, perm_init: PermutationInitializer) -> 
     # As several of the modules in the tested models are compatible,
     #   some permutations should be merged.
     assert len(perm_init.permutations) < len(perm_init.permutations_init)
+
+    # Bias isn't turned off in either resnet18 or MLP
+    #   -> applies_to == BOTH should be present.
+    if any(hasattr(m, "bias") and m.bias is not None for m in modules):
+        assert any(
+            mi.applies_to == AppliesTo.BOTH
+            for p in perm_init.permutations
+            for mi in p.modules
+        )
