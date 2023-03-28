@@ -4,6 +4,21 @@
 2. Recompute the `LayerNorm`s by calling `model_b.forward()`
    on every batch in the training dataset (?)
 
+Problem with recomputing the `LayerNorm`s: `DataLoader`s can give out arbitrary number of args. 
+It is unknown which args are needed to call `model.forward()`.
+
+Proposed solution:
+
+```python
+from torch.utils.data import DataLoader
+
+def update_norms(model, dataloader, input_indices: list[int], *args, **kwargs):
+    for batch in dataloader:
+        inputs = [batch[i] for i in input_indices]
+        _ = model(*inputs, *args, **kwargs)  # update norms
+```
+
+
 ## `Interpolation`
 
 - Must be capable of interpolating between two or more models
