@@ -1,42 +1,6 @@
 ## `PermutationCoordinateDescent`
 
-- Use column-indices instead of permutation-tensors
-  - Makes checking for composability easier
-  - Takes less memory
-  - Is more readable
-  - **TODO**: Figure out how to use this to calculate the permutations
-- Find parents / children:
-    1. Find all parents / children
-    2. Filter out parents / children that are not composable
-    3. Save the result in a `dict[id, list[id]]`
-- In the permutation loop: use one function 
-  to extract the weights and permutation columns
-  from the parents / children
-
-Things to understand: 
-
-- The loss:
-
-```python
-oldL = torch.einsum('ij,ij->i', A, torch.eye(n)[perm[p].long()]).sum()
-newL = torch.einsum('ij,ij->i', A,torch.eye(n)[ci, :]).sum()
-progress = progress or newL > oldL + 1e-12
-```
-
-- The permutation (`get_permuted_param`). Specifically, 
-  why are the tensors reshaped as they are, and how does the 
-  permutation even work if `ci` is calculated on the reshaped tensors
-  but is applied to the original tensors?
-- Is there a general way to find out which axes to permute 
-  independent of the `Module` type? Or do I have to find that out
-  for every `Module` type and create a `dict` that saves that info?
-  Or maybe its own class. That could save the module id, the weight & bias,
-  the permutation columns, and the axis along which to permute.
-
-
-## `PermuteColumns`
-
-1. Permute the columns of `model_b`
+1. Permute the columns of `model_b` **DONE**
 2. Recompute the `LayerNorm`s by calling `model_b.forward()`
    on every batch in the training dataset (?)
 
@@ -70,7 +34,7 @@ class Interpolation:
         self.results = torch.zeros(len(models))
 
     def interpolate(
-            self, mode: str = "lerp", steps: int = 10, metric: str = "accuracy"
+            self, method: str = "lerp", steps: int = 10, metric: str = "accuracy"
     ) -> None:
         ...
 ```
@@ -87,29 +51,29 @@ from torch.utils.data import DataLoader
 
 
 class Rebasin:
-    def __init__(
-            self, 
-            model_target: torch.nn.Module, 
-            models: list[torch.nn.Module],
-            train_dataloader: DataLoader, 
-            val_dataloader: DataLoader
-    ) -> None:
-        self.model_target = model_target
-        self.models = models
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
+  def __init__(
+          self,
+          target_model: torch.nn.Module,
+          models_to_permute: list[torch.nn.Module],
+          train_dataloader: DataLoader,
+          val_dataloader: DataLoader
+  ) -> None:
+    self.target_model = target_model
+    self.models_to_permute = models_to_permute
+    self.train_dataloader = train_dataloader
+    self.val_dataloader = val_dataloader
 
-    def rebasin(self, method: str = "weight") -> None:
-        assert method in ("weight", "activation", "straight through")
-        ...
+  def rebasin(self, method: str = "weight") -> None:
+    assert method in ("weight", "activation", "straight through")
+    ...
 
-    def interpolate(
-            self,
-            savedir: Path,
-            save_all: bool = False,
-            mode: str = "lerp", 
-            steps: int = 10, 
-            metric: str = "accuracy"
-    ) -> None:
-        ...
+  def interpolate(
+          self,
+          savedir: Path,
+          save_all: bool = False,
+          method: str = "lerp",
+          steps: int = 10,
+          metric: str = "accuracy"
+  ) -> None:
+    ...
 ```
