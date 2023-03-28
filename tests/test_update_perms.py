@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-import torch
+import copy
 
-from rebasin.perm.update_perms import calculate_progress
+import torch
+from torch import nn
+
+from rebasin.perm.structs import MODULE_AXES, AppliesTo, ModuleInfo, Permutation
+from rebasin.perm.update_perms import (
+    apply_all_permutations,
+    apply_permutation,
+    calculate_progress,
+)
 
 
 def test_calculate_progress() -> None:
@@ -21,3 +29,118 @@ def test_calculate_progress() -> None:
     progress = calculate_progress(cost_mat, perm_old, perm_new)
 
     assert not progress
+
+
+def test_apply_permutation() -> None:
+    """Test the application of a permutation."""
+    module_a = nn.Linear(3, 3)
+    module_b = nn.Linear(3, 3)
+
+    # Needed for manual setting of parameters
+    for parameter in module_a.parameters():
+        parameter.requires_grad = False
+    for parameter in module_b.parameters():
+        parameter.requires_grad = False
+
+    w_a_old = copy.deepcopy(module_a.weight)
+    b_a_old = copy.deepcopy(module_a.bias)
+    w_b_old = copy.deepcopy(module_b.weight)
+    b_b_old = copy.deepcopy(module_b.bias)
+
+    module_info = ModuleInfo(
+        module_a=module_a,
+        module_b=module_b,
+        applies_to=AppliesTo.BOTH,
+        axis=0,
+        axis_info=MODULE_AXES[nn.Linear]
+    )
+
+    permutation = Permutation(torch.tensor([2, 0, 1]), [module_info])
+    params = apply_permutation(permutation)
+
+    # Check types
+    assert isinstance(params, list)
+    assert all(isinstance(pair, tuple) for pair in params)
+    assert all(
+        isinstance(p, (torch.Tensor, nn.Parameter)) for pair in params for p in pair
+    )
+
+    # Check length: weight & bias!
+    assert len(params) == 2
+
+    # Check permutation
+    assert torch.allclose(params[0][0], w_a_old)
+    assert torch.allclose(params[1][0], b_a_old)
+    assert torch.allclose(params[0][1], w_b_old[permutation.perm_indices])
+    assert torch.allclose(params[1][1], b_b_old[permutation.perm_indices])
+
+
+def test_apply_all_permutations() -> None:
+    module_a = nn.Linear(3, 3)
+    module_b = nn.Linear(3, 3)
+
+    # Needed for manual setting of parameters
+    for parameter in module_a.parameters():
+        parameter.requires_grad = False
+    for parameter in module_b.parameters():
+        parameter.requires_grad = False
+
+    w_a_old = copy.deepcopy(module_a.weight)
+    b_a_old = copy.deepcopy(module_a.bias)
+    w_b_old = copy.deepcopy(module_b.weight)
+    b_b_old = copy.deepcopy(module_b.bias)
+
+    module_info1 = ModuleInfo(
+        module_a=module_a,
+        module_b=module_b,
+        applies_to=AppliesTo.BOTH,
+        axis=0,
+        axis_info=MODULE_AXES[nn.Linear]
+    )
+
+    module_info2 = ModuleInfo(
+        module_a=module_a,
+        module_b=module_b,
+        applies_to=AppliesTo.WEIGHT,
+        axis=1,
+        axis_info=MODULE_AXES[nn.Linear]
+    )
+
+    perm0 = Permutation(torch.tensor([2, 0, 1]), [module_info1])
+    perm1 = Permutation(torch.tensor([1, 2, 0]), [module_info2])
+
+    id_to_perm = {id(module_b): [perm0, perm1]}
+
+    params_full = apply_all_permutations(module_info1, id_to_perm)
+    params_except = apply_all_permutations(module_info2, id_to_perm, except_axis=0)
+
+    # Check types
+    assert isinstance(params_full, list)
+    assert all(isinstance(pair, tuple) for pair in params_full)
+    assert all(
+        isinstance(p, (torch.Tensor, nn.Parameter))
+        for pair in params_full for p in pair
+    )
+
+    assert isinstance(params_except, list)
+    assert all(isinstance(pair, tuple) for pair in params_except)
+    assert all(
+        isinstance(p, (torch.Tensor, nn.Parameter))
+        for pair in params_except for p in pair
+    )
+
+    # Check length: w&b for params_full, w for params_except
+    assert len(params_full) == 2
+    assert len(params_except) == 1
+
+    # Check permutation
+    w_b_perm_full = w_b_old[perm0.perm_indices]
+    w_b_perm_full = w_b_perm_full[:, perm1.perm_indices]
+
+    assert torch.allclose(params_full[0][0], w_a_old)
+    assert torch.allclose(params_full[1][0], b_a_old)
+    assert torch.allclose(params_full[0][1], w_b_perm_full)
+    assert torch.allclose(params_full[1][1], b_b_old[perm0.perm_indices])
+
+    assert torch.allclose(params_except[0][0], w_a_old)
+    assert torch.allclose(params_except[0][1], w_b_old[:, perm1.perm_indices])
