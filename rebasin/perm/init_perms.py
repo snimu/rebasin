@@ -32,7 +32,7 @@ class PermutationInitializer:
 
         # The mapping of Module-IDs to permutations.
         # Used to permute a specific module along every axis.
-        self.id_to_permutation: dict[int, list[Permutation]] = {}
+        self.id_to_permutations: dict[int, list[Permutation]] = {}
         self._map_module_id_to_permutations()
 
     def _initialize_permutations(
@@ -294,7 +294,7 @@ class PermutationInitializer:
         for permutation in self.permutations:
             for module_info in permutation.modules:
                 id_ = id(module_info.module_b)
-                if id_ in self.id_to_permutation:
-                    self.id_to_permutation[id_].append(permutation)
+                if id_ in self.id_to_permutations:
+                    self.id_to_permutations[id_].append(permutation)
                 else:
-                    self.id_to_permutation[id_] = [permutation]
+                    self.id_to_permutations[id_] = [permutation]
