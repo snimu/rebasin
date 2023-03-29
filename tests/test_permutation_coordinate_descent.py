@@ -9,17 +9,17 @@ import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
+from rebasin import PermutationCoordinateDescent
+from rebasin.weight_matching.permutation_coordinate_descent import (
+    apply_all_permutations,
+    apply_permutation,
+    calculate_progress,
+)
 from rebasin.weight_matching.structs import (
     MODULE_AXES,
     AppliesTo,
     ModuleInfo,
     Permutation,
-)
-from rebasin.weight_matching.update_perms import (
-    PermutationCoordinateDescent,
-    apply_all_permutations,
-    apply_permutation,
-    calculate_progress,
 )
 from tests.fixtures.models import MLP
 
