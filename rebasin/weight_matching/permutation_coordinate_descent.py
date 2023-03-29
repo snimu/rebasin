@@ -391,36 +391,11 @@ class PermutationCoordinateDescent:
 
         return progress
 
+    @torch.no_grad()
     def apply_permutations(self) -> None:
         """
         Apply the calculated permutations to the model.
         """
-        # Get the modules and set requires_grad to False.
-        # This is necessary to manually set weights and biases.
-        # Save the previous settings so that we can restore them later.
-        modules_b = [m for m in self.model_b.modules() if hasattr(m, "weight")]
-        grad_settings_weights = [m.weight.requires_grad for m in modules_b]
-        grad_settings_biases = [
-            m.bias.requires_grad
-            if hasattr(m, "bias") and m.bias is not None
-            else None
-            for m in modules_b
-        ]
-
-        for module in modules_b:
-            module.weight.requires_grad = False
-            if hasattr(module, "bias") and module.bias is not None:
-                module.bias.requires_grad = False
-
         # Apply the permutations
         for permutation in self.permutations:
             apply_permutation(permutation, set_module_params=True)
-
-        # Reset the grad-settings
-        for module, w_setting in zip(modules_b, grad_settings_weights, strict=True):
-            module.weight.requires_grad = w_setting
-
-        for module, b_setting in zip(modules_b, grad_settings_biases, strict=True):
-            if hasattr(module, "bias") and module.bias is not None:
-                assert b_setting is not None
-                module.bias.requires_grad = b_setting
