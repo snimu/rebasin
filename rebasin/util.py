@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 def recalculate_batch_norms(
         model: nn.Module,
         dataloader: DataLoader[Any],
-        input_indices: Sequence[int] | None,
+        input_indices: int | Sequence[int],
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
@@ -51,7 +51,10 @@ def recalculate_batch_norms(
     model.train()
 
     for batch in dataloader:
-        inputs, _ = get_inputs_labels(batch, input_indices, [0])
+        if isinstance(batch, Sequence):
+            inputs, _ = get_inputs_labels(batch, input_indices, 0)
+        else:
+            inputs = [batch]
         model(*inputs, *forward_args, **forward_kwargs)
 
     if not training:
@@ -60,8 +63,8 @@ def recalculate_batch_norms(
 
 def get_inputs_labels(
         batch: Any,
-        input_indices: int | Sequence[int] | None = None,
-        label_indices: int | Sequence[int] | None = None
+        input_indices: int | Sequence[int] = 0,
+        label_indices: int | Sequence[int] = 1
 ) -> tuple[list[Any], list[Any]]:
     """
     Get the inputs and outputs from a batch.
@@ -82,15 +85,6 @@ def get_inputs_labels(
     Returns:
         The inputs and labels.
     """
-    assert (
-        (input_indices is None and label_indices is None)
-        or (input_indices is not None and label_indices is not None)
-    ), "Either provide both input- and label-indices, or neither"
-
-    if label_indices is None or input_indices is None:
-        x, y = batch
-        return [x], [y]
-
     if isinstance(input_indices, int):
         input_indices = [input_indices]
     if isinstance(label_indices, int):

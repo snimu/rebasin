@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -37,7 +36,7 @@ def test_recalculate_batch_norms() -> None:
     #   if there are no BatchNorms in the model
     scc.call_count = 0
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
-    recalculate_batch_norms(model, dataloader, None)
+    recalculate_batch_norms(model, dataloader, 0)
     assert scc.call_count == 0
 
 
@@ -78,9 +77,3 @@ def test_get_inputs_labels() -> None:
     assert torch.allclose(labels[0], out1)
     assert torch.allclose(labels[1], out2)
     assert torch.allclose(labels[2], out3)
-
-    # Test error raising
-    with pytest.raises(AssertionError):
-        get_inputs_labels(batch, input_indices=[2, 0, 1], label_indices=None)
-    with pytest.raises(AssertionError):
-        get_inputs_labels(batch, input_indices=None, label_indices=[5, 3, 4])
