@@ -37,7 +37,7 @@ def test_recalculate_batch_norms() -> None:
     #   if there are no BatchNorms in the model
     scc.call_count = 0
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
-    recalculate_batch_norms(model, dataloader, [0])
+    recalculate_batch_norms(model, dataloader, None)
     assert scc.call_count == 0
 
 

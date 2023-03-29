@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 def recalculate_batch_norms(
         model: nn.Module,
         dataloader: DataLoader[Any],
-        input_indices: Sequence[int],
+        input_indices: Sequence[int] | None,
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
@@ -27,7 +27,7 @@ def recalculate_batch_norms(
             The DataLoader to use for recalculating the statistics.
             Should ideally be the training DataLoader.
         input_indices:
-            Many DataLoaders return several inputs and outputs.
+            Many DataLoaders return several inputs and labels.
             These can sometimes be used in unexpected ways.
             To make sure that the correct outputs of the dataloader are used
             as inputs to the model's forward pass, you can specify the indices
@@ -51,7 +51,7 @@ def recalculate_batch_norms(
     model.train()
 
     for batch in dataloader:
-        inputs = [batch[i] for i in input_indices]
+        inputs, _ = get_inputs_labels(batch, input_indices, [0])
         model(*inputs, *forward_args, **forward_kwargs)
 
     if not training:
