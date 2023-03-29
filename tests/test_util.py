@@ -11,7 +11,8 @@ from tests.fixtures.models import SaveCallCount
 def test_recalculate_batch_norms() -> None:
     conv = nn.Conv2d(1, 1, 3)
     bn = nn.BatchNorm2d(1)
-    model = torch.nn.Sequential(conv, bn)
+    scc = SaveCallCount()
+    model = torch.nn.Sequential(conv, bn, scc)
     dataloader = DataLoader(TensorDataset(torch.rand(10, 1, 10, 10)), batch_size=10)
 
     # Test whether recalculate_batch_norms works
@@ -19,6 +20,7 @@ def test_recalculate_batch_norms() -> None:
     assert torch.all(bn.running_mean == torch.zeros_like(bn.running_mean))
     recalculate_batch_norms(model, dataloader, [0])
     assert torch.all(bn.running_mean != torch.zeros_like(bn.running_mean))
+    assert scc.call_count > 0  # Test that scc works
 
     # Test whether recalculate_batch_norms works in eval mode and resets it afterwards
     model.eval()
@@ -29,8 +31,7 @@ def test_recalculate_batch_norms() -> None:
 
     # Test whether recalculate_batch_norms stops early
     #   if there are no BatchNorms in the model
-    scc = SaveCallCount()
+    scc.call_count = 0
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
     recalculate_batch_norms(model, dataloader, [0])
     assert scc.call_count == 0
-
