@@ -7,7 +7,13 @@ import torch
 from torch import nn
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
-from .structs import MODULE_AXES, AppliesTo, AxisInfo, ModuleInfo, Permutation
+from rebasin.weight_matching.structs import (
+    MODULE_AXES,
+    AppliesTo,
+    AxisInfo,
+    ModuleInfo,
+    Permutation,
+)
 
 NODE_TYPES = FunctionNode | ModuleNode | TensorNode
 
