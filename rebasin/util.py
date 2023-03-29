@@ -56,3 +56,46 @@ def recalculate_batch_norms(
 
     if not training:
         model.eval()
+
+
+def get_inputs_labels(
+        batch: Any,
+        input_indices: int | Sequence[int] | None = None,
+        label_indices: int | Sequence[int] | None = None
+) -> tuple[list[Any], list[Any]]:
+    """
+    Get the inputs and outputs from a batch.
+
+    Args:
+        batch:
+            The batch.
+        input_indices:
+            Many DataLoaders return several inputs and labels per batch.
+            These can sometimes be used in unexpected ways.
+            To make sure that the correct outputs of the dataloader are used
+            as inputs to the model's forward pass, you can specify the indices
+            at which the inputs are located, in the order that they should be
+            passed to the model.
+        label_indices:
+            Like `input_indices`, but for the labels.
+
+    Returns:
+        The inputs and labels.
+    """
+    assert (
+        (input_indices is None and label_indices is None)
+        or (input_indices is not None and label_indices is not None)
+    ), "Either provide both input- and label-indices, or neither"
+
+    if label_indices is None or input_indices is None:
+        x, y = batch
+        return [x], [y]
+
+    if isinstance(input_indices, int):
+        input_indices = [input_indices]
+    if isinstance(label_indices, int):
+        label_indices = [label_indices]
+
+    inputs = [batch[i] for i in input_indices]
+    labels = [batch[i] for i in label_indices]
+    return inputs, labels

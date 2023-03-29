@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from rebasin import recalculate_batch_norms
+from rebasin.util import get_inputs_labels
 from tests.fixtures.models import SaveCallCount
 
 
@@ -35,3 +39,48 @@ def test_recalculate_batch_norms() -> None:
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
     recalculate_batch_norms(model, dataloader, [0])
     assert scc.call_count == 0
+
+
+def test_get_inputs_labels() -> None:
+    # Setup
+    in1, in2, in3 = torch.rand(10, 3), torch.rand(10, 3), torch.rand(10, 3)
+    out1, out2, out3 = torch.rand(10, 3), torch.rand(10, 3), torch.rand(10, 3)
+
+    # For mypy:
+    inputs: list[Any]
+    labels: list[Any]
+    batch: tuple[torch.Tensor, ...]
+
+    # Test default indices
+    batch = in1, out1
+    inputs, labels = get_inputs_labels(batch)
+    assert torch.allclose(inputs[0], in1)
+    assert torch.allclose(labels[0], out1)
+
+    # Test custom indices
+    batch = in1, in2, out1, out2
+    inputs, labels = get_inputs_labels(
+        batch, input_indices=[0, 1], label_indices=[2, 3]
+    )
+    assert torch.allclose(inputs[0], in1)
+    assert torch.allclose(inputs[1], in2)
+    assert torch.allclose(labels[0], out1)
+    assert torch.allclose(labels[1], out2)
+
+    # Test mixed indices
+    batch = in2, in3, in1, out2, out3, out1
+    inputs, labels = get_inputs_labels(
+        batch, input_indices=[2, 0, 1], label_indices=[5, 3, 4]
+    )
+    assert torch.allclose(inputs[0], in1)
+    assert torch.allclose(inputs[1], in2)
+    assert torch.allclose(inputs[2], in3)
+    assert torch.allclose(labels[0], out1)
+    assert torch.allclose(labels[1], out2)
+    assert torch.allclose(labels[2], out3)
+
+    # Test error raising
+    with pytest.raises(AssertionError):
+        get_inputs_labels(batch, input_indices=[2, 0, 1], label_indices=None)
+    with pytest.raises(AssertionError):
+        get_inputs_labels(batch, input_indices=None, label_indices=[5, 3, 4])
