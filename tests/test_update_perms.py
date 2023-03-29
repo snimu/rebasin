@@ -9,8 +9,13 @@ import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
-from rebasin.perm.structs import MODULE_AXES, AppliesTo, ModuleInfo, Permutation
-from rebasin.perm.update_perms import (
+from rebasin.weight_matching.structs import (
+    MODULE_AXES,
+    AppliesTo,
+    ModuleInfo,
+    Permutation,
+)
+from rebasin.weight_matching.update_perms import (
     PermutationCoordinateDescent,
     apply_all_permutations,
     apply_permutation,

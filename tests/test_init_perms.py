@@ -4,8 +4,8 @@ import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
-from rebasin.perm.init_perms import PermutationInitializer
-from rebasin.perm.structs import AppliesTo
+from rebasin.weight_matching.init_perms import PermutationInitializer
+from rebasin.weight_matching.structs import AppliesTo
 
 from .fixtures.models import MLP
 
