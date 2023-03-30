@@ -170,6 +170,22 @@ class TestPermutationCoordinateDescent:
         model_b = MLP(5)
         self.common_tests(model_a, model_b, torch.randn(5))
 
+    @pytest.mark.xfail(
+        reason="MultiheadAttention has multiple weights "
+               "and I currently only look for parameters called 'weight'."
+    )
+    def test_multihead_attention(self) -> None:
+        embed_dim = num_heads = 8
+
+        model_a = nn.MultiheadAttention(embed_dim, num_heads)
+        model_b = nn.MultiheadAttention(embed_dim, num_heads)
+
+        query = torch.randn(embed_dim, num_heads, requires_grad=True)
+        key = torch.randn(embed_dim, num_heads, requires_grad=True)
+        value = torch.randn(embed_dim, num_heads, requires_grad=True)
+
+        self.common_tests(model_a, model_b, (query, key, value))
+
     def common_tests(
             self,
             model_a: nn.Module,

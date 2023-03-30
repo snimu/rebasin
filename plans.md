@@ -1,58 +1,24 @@
 ## `PermutationCoordinateDescent`
 
-1. Permute the columns of `model_b` **DONE**
-2. Recompute the `LayerNorm`s by calling `model_b.forward()`
-   on every batch in the training dataset (?)
+Problem: only permutes weights called "weight" and biases called "bias",
+which excludes for example `MultiheadAttention` layers. 
+These have weights called "in_proj_weight", "out_proj.weight", etc.
 
-Problem with recomputing the `LayerNorm`s: `DataLoader`s can give out arbitrary number of args. 
-It is unknown which args are needed to call `model.forward()`.
-
-Proposed solution:
+Solution:
 
 ```python
-from torch.utils.data import DataLoader
+# DON'T:
+if name == "weight" or name == "bias":
+  ...
 
-def update_norms(model, dataloader, input_indices: list[int], *args, **kwargs):
-    for batch in dataloader:
-        inputs = [batch[i] for i in input_indices]
-        _ = model(*inputs, *args, **kwargs)  # update norms
+# DO:
+for name, param in model.named_parameters():
+  if "weight" in name or "bias" in name:
+    ...
 ```
-
-
-## `Interpolation`
-
-- Must be capable of interpolating between two or more models
-- Recompute the `LayerNorm`s by calling `model.forward()`
-   on every batch in the training dataset for every interpolated model (?)
 
 ```python
-from pathlib import Path
 
-import torch
-from torch.utils.data import DataLoader
-
-
-class Interpolation:
-    def __init__(
-            self, 
-            models: list[torch.nn.Module], 
-            train_dataloader: DataLoader, 
-            val_dataloader: DataLoader,
-            savedir: Path,
-            save_all: bool = False,
-    ) -> None:
-        self.models = models
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
-        self.savedir = savedir
-        self.save_all = save_all  # If True, save all models, else, only the best
-        self.results = torch.zeros(len(models))
-
-    def interpolate(
-            self, method: str = "lerp", steps: int = 10, metric: str = "accuracy"
-    ) -> None:
-        ...
-```
 
 ## `Rebasin`
 
