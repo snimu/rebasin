@@ -55,7 +55,12 @@ class Interpolation:
         self.best_model = self.models[min_idx]
         self.best_model_name = f"model_{min_idx}.pt"
 
-    def interpolate(self, steps: int = 20) -> None:
+    def interpolate(
+            self,
+            steps: int = 20,
+            savedir: str | Path | None = None,
+            save_all: bool = False
+    ) -> None:
         """Interpolate between the models and save the best one or all."""
 
     def evaluate_model(self, model: nn.Module) -> float:
@@ -111,9 +116,15 @@ class LerpSimple(Interpolation):
     Linear interpolation between two models.
     """
 
-    def interpolate(self, steps: int = 20) -> None:
+    def interpolate(
+            self,
+            steps: int = 20,
+            savedir: str | Path | None = None,
+            save_all: bool | None = None
+    ) -> None:
         """
-        Interpolate between the models and save the best one or all.
+        Interpolate between the models and save the best one or all
+        in `self.best_model`.
 
         For two models, the interpolation looks like this
         (using `m_a` to denote model number `a`, and i_ab_c to denote
@@ -144,39 +155,76 @@ class LerpSimple(Interpolation):
 
         |
 
-        The names of the saved models are as follows:
-
-         - `model_{model_num}.pt` if the model is one of the original models.
-            model_num is the index of the model in the `models` argument.
-         - `interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt` if the model
-            is interpolated. `m_i` and `m_i+1` are the indices of the models
-            between which the interpolation is done.
-            `percentage` is the percentage of the way through the interpolation.
-            If it is small, the model is closer to `m_i`, and if it is large,
-            the model is closer to `m_i+1`.
-
         Args:
             steps:
                 The number of steps to take between each pair of models.
-        """
 
+            savedir:
+                The directory to save the models in. Overwrites the `savedir`
+                argument passed to the constructor if not None.
+                If both are None, the models are not saved.
+
+                If not None, the following naming schema is used for the files:
+
+                - `model_{model_num}.pt` if the model is one of the original models.
+                    model_num is the index of the model in the `models` argument.
+                    The original models are not saved, except the best model.
+
+                - `interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt` if the model
+                    is interpolated. `m_i` and `m_i+1` are the indices of the models
+                    between which the interpolation is done.
+                    `percentage` is the percentage of the way through the interpolation.
+                    If it is small, the model is closer to `m_i`, and if it is large,
+                    the model is closer to `m_i+1`.
+
+            save_all:
+                Whether to save all interpolated models, or just the best one.
+                The best model is saved either way if a `savedir` is given.
+                Overwrites the `save_all` argument passed to the constructor
+                if not None.
+        """
+        # SANITY CHECKS AND DEFAULT SETTINGS
+        assert isinstance(savedir, (Path, str, type(None)))
+
+        if savedir is None:
+            savedir = self.savedir
+        elif isinstance(savedir, str):
+            savedir = Path(savedir)
+
+        if save_all is None:
+            save_all = self.save_all
+
+        assert isinstance(save_all, bool)
+
+        # INTERPOLATION
         for step in range(steps):
             # Interpolate between the two models
             # (step + 1) so that it never starts at zero percent.
             # (steps + 2) so that it never ends at 100 percent.
             # This is because the start and end models already exist
             percentage = (step + 1) / (steps + 2)
-            self._interpolate_step(percentage=percentage)
-
-        # Save the best model, unless self.save_all is True.
-        # In that case, all models are already saved in _interpolate_step.
-        if self.savedir is not None and not self.save_all:
-            torch.save(
-                self.best_model.state_dict(),
-                self.savedir.joinpath(self.best_model_name)
+            self._interpolate_step(
+                percentage=percentage, savedir=savedir, save_all=save_all
             )
 
-    def _interpolate_step(self, percentage: float) -> None:
+        # SAVE THE BEST MODEL
+        # If all interpolated models are saved and the best model is interpolated,
+        #   it is unnecessary to save it again.
+        # Conversely, if not all interpolated models are saved, the best model
+        #   must be saved.
+        # Alternatively, save_all only leads to interpolated models being saved,
+        #   so the best model must be saved again if it is not interpolated.
+        save_best_model = (not save_all) or (self.best_model in self.models)
+
+        if save_best_model and (savedir is not None):
+            torch.save(
+                self.best_model.state_dict(),
+                savedir.joinpath(self.best_model_name)
+            )
+
+    def _interpolate_step(
+            self, percentage: float, savedir: Path | None, save_all: bool
+    ) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
                 zip(self.models[:-1], self.models[1:], strict=True)
@@ -207,5 +255,5 @@ class LerpSimple(Interpolation):
                 self.best_model = model_interp
                 self.best_model_name = filename  # for later saving if not save_all
 
-            if self.savedir is not None and self.save_all:
-                torch.save(model_interp.state_dict(), self.savedir.joinpath(filename))
+            if savedir is not None and save_all:
+                torch.save(model_interp.state_dict(), savedir.joinpath(filename))
