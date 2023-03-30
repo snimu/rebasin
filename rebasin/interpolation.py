@@ -106,7 +106,6 @@ class Interpolation:
             assert savedir is not None
 
 
-
 class LerpSimple(Interpolation):
     """
     Linear interpolation between two models.
@@ -143,6 +142,19 @@ class LerpSimple(Interpolation):
 
         This means that the total number of interpolations is `steps * (n - 1)`.
 
+        |
+
+        The names of the saved models are as follows:
+
+         - `model_{model_num}.pt` if the model is one of the original models.
+            model_num is the index of the model in the `models` argument.
+         - `interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt` if the model
+            is interpolated. `m_i` and `m_i+1` are the indices of the models
+            between which the interpolation is done.
+            `percentage` is the percentage of the way through the interpolation.
+            If it is small, the model is closer to `m_i`, and if it is large,
+            the model is closer to `m_i+1`.
+
         Args:
             steps:
                 The number of steps to take between each pair of models.
@@ -154,7 +166,7 @@ class LerpSimple(Interpolation):
             # (steps + 2) so that it never ends at 100 percent.
             # This is because the start and end models already exist
             percentage = (step + 1) / (steps + 2)
-            self._interpolate_step(percentage=percentage, step=step)
+            self._interpolate_step(percentage=percentage)
 
         # Save the best model, unless self.save_all is True.
         # In that case, all models are already saved in _interpolate_step.
@@ -164,7 +176,7 @@ class LerpSimple(Interpolation):
                 self.savedir.joinpath(self.best_model_name)
             )
 
-    def _interpolate_step(self, percentage: float, step: int) -> None:
+    def _interpolate_step(self, percentage: float) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
                 zip(self.models[:-1], self.models[1:], strict=True)
@@ -188,7 +200,7 @@ class LerpSimple(Interpolation):
             self.losses_interpolated.append(loss)
 
             # Save
-            filename = f"interp_models_{model_num}_{model_num+1}_step_{step}.pt"
+            filename = f"interp_models_{model_num}_{model_num+1}_perc_{percentage}.pt"
 
             if loss < self.best_loss:
                 self.best_loss = loss
@@ -197,4 +209,3 @@ class LerpSimple(Interpolation):
 
             if self.savedir is not None and self.save_all:
                 torch.save(model_interp.state_dict(), self.savedir.joinpath(filename))
-
