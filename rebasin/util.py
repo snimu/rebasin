@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 from torch import nn
@@ -96,7 +96,8 @@ def get_inputs_labels(
 
 
 def contains_parameter(
-        parameters: Sequence[nn.Parameter], parameter: nn.Parameter
+        parameters: Sequence[nn.Parameter] | Iterator[nn.Parameter],
+        parameter: nn.Parameter
 ) -> bool:
     """
     Check if a sequence of parameters contains a parameter.
