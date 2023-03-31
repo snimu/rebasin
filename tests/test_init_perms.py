@@ -4,10 +4,30 @@ import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
+from rebasin import util
 from rebasin.weight_matching.init_perms import PermutationInitializer
-from rebasin.weight_matching.structs import AppliesTo
+from rebasin.weight_matching.structs import AxisType
 
 from .fixtures.models import MLP
+
+
+def test_init_permutations_multihead_attention() -> None:
+    """Test the initialization of the permutations."""
+    model_a = nn.MultiheadAttention(8, 8)
+    model_b = nn.MultiheadAttention(8, 8)
+    x = torch.randn(8, 8)
+    perm_init = PermutationInitializer(model_a, model_b, (x, x, x))
+
+    for permutation in perm_init.permutations:
+        parameter_names = [p.name for p in permutation.parameters]
+        for param_info in permutation.parameters:
+            # Bias only on axis 0
+            if "in_proj_weight" in parameter_names and param_info.axis == 0:
+                assert "in_proj_bias" in parameter_names
+                assert "out_proj.weight" not in parameter_names
+            if "out_proj.weight" in parameter_names and param_info.axis == 0:
+                assert "out_proj.bias" in parameter_names
+                assert "in_proj_weight" not in parameter_names
 
 
 def test_init_permutations_mlp() -> None:
@@ -17,7 +37,7 @@ def test_init_permutations_mlp() -> None:
     input_data = torch.randn(5)
     perm_init = PermutationInitializer(model_a, model_b, input_data)
 
-    common_init_tests(model_b, perm_init)
+    common_init_tests(model_a, model_b, perm_init)
 
 
 def test_init_permutations_resnet() -> None:
@@ -27,56 +47,47 @@ def test_init_permutations_resnet() -> None:
     input_data = torch.randn(1, 3, 224, 224)
     perm_init = PermutationInitializer(model_a, model_b, input_data)
 
-    common_init_tests(model_b, perm_init)
+    common_init_tests(model_a, model_b, perm_init)
 
 
-def common_init_tests(model_b: nn.Module, perm_init: PermutationInitializer) -> None:
+def common_init_tests(
+        model_a: nn.Module, model_b: nn.Module, perm_init: PermutationInitializer
+) -> None:
     modules = [
-        m for m in model_b.modules() if hasattr(m, "weight") and m.weight is not None
+        m for m in model_b.modules()
     ]
+    module_ids = [id(m) for m in modules]
 
     assert len(perm_init.permutations_init) > len(modules)  # several axes per module
 
-    for permutation in perm_init.permutations_init:
-        for module_info in permutation.modules:
-            assert module_info.module_b in model_b.modules()
-            pshape = permutation.perm_indices.shape
-
-            if module_info.applies_to in (AppliesTo.WEIGHT, AppliesTo.BOTH):
-                wshape = module_info.module_b.weight.shape
-                assert isinstance(wshape, torch.Size)
-                assert isinstance(pshape, torch.Size)
-                assert wshape[module_info.axis] == pshape[0]
-            elif module_info.applies_to in (AppliesTo.BIAS, AppliesTo.BOTH):
-                bshape = module_info.module_b.bias.shape
-                assert isinstance(bshape, torch.Size)
-                assert isinstance(pshape, torch.Size)
-                assert bshape[0] == pshape[0]
-
     for permutation in perm_init.permutations:
-        assert all(mi.module_b in model_b.modules() for mi in permutation.modules)
+        for param_info in permutation.parameters:
+            assert param_info.module_id in perm_init.id_to_permutation_init
+            assert param_info.module_id in module_ids
+            assert util.contains_parameter(model_a.parameters(), param_info.param_a)
+            assert util.contains_parameter(model_b.parameters(), param_info.param_b)
+
+            assert permutation.perm_indices.shape[0] == \
+                   param_info.param_a.shape[param_info.axis]
+
+            assert permutation.perm_indices.shape[0] == \
+                   param_info.param_b.shape[param_info.axis]
 
     # As several of the modules in the tested models are compatible,
     #   some permutations should be merged.
     assert len(perm_init.permutations) < len(perm_init.permutations_init)
 
     # Bias isn't turned off in either resnet18 or MLP
-    #   -> applies_to == BOTH should be present.
-    if any(hasattr(m, "bias") and m.bias is not None for m in modules):
-        assert any(
-            mi.applies_to == AppliesTo.BOTH
-            for p in perm_init.permutations
-            for mi in p.modules
-        )
-
-    # Every module id that is in perm_init.id_to_permutation_init
-    #   should be in perm_init.id_to_permutation
-    assert all(
-        id_ in perm_init.id_to_permutations
-        for id_ in perm_init.id_to_permutation_init
+    #   -> axis_type = AxisType.NEITHER should be present.
+    has_bias = (
+        "bias" in name
+        for m in modules
+        for name, _ in m.named_parameters()
     )
 
-    # Every id in perm_init.id_to_permutation
-    #   should correspond to a module in modules
-    ids = [id(m) for m in modules]
-    assert all(id_ in ids for id_ in perm_init.id_to_permutations)
+    if has_bias:
+        assert any(
+            param_info.axis_type == AxisType.NEITHER
+            for permutation in perm_init.permutations
+            for param_info in permutation.parameters
+        )
