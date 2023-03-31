@@ -122,19 +122,18 @@ class LerpSimple(Interpolation):
             savedir: str | Path | None = None,
             save_all: bool | None = None
     ) -> None:
-        """
+        r"""
         Interpolate between the models and save the best one or all
-        in `self.best_model`.
+        in :code:`self.best_model`.
 
-        For two models, the interpolation looks like this
-        (using `m_a` to denote model number `a`, and i_ab_c to denote
-        interpolation step `c` between models number `a` and `b`):
+        For two models and `s` steps, the interpolation looks like this
+        (using :math:`m_a` to denote model number :math:`a`,
+        and :math:`i_{ab,c}` to denote interpolation step `c`
+        between models number `a` and `b`):
 
         |
 
-        ```
-        m_1 - i_12_1 - ... - i_12_[steps] - m_2
-        ```
+        :math:`m_1 - i_{12,1} - ... - i_{12,s} - m_2`
 
         |
 
@@ -143,15 +142,12 @@ class LerpSimple(Interpolation):
 
         |
 
-        ```
-        m_1 - i_12_1 - ... - i_12_[steps]
-        - m_2 - i_23_1 - ... - i_23_[steps]
-        - m_3 - ... - m_n
-        ```
+        :math:`m_1 - i_{12,1} - ... - i_{12,s} - m_2
+        - i_{23,1} - ... - i_{23,s} - m_3 - ... - m_n`
 
         |
 
-        This means that the total number of interpolations is `steps * (n - 1)`.
+        This means that the total number of interpolations is :math:`s \cdot (n - 1)`.
 
         |
 
@@ -160,22 +156,25 @@ class LerpSimple(Interpolation):
                 The number of steps to take between each pair of models.
 
             savedir:
-                The directory to save the models in. Overwrites the `savedir`
+                The directory to save the models in. Overwrites the :code:`savedir`
                 argument passed to the constructor if not None.
-                If both are None, the models are not saved.
+                If both are :code:`None`, the models are not saved.
 
-                If not None, the following naming schema is used for the files:
+                If :code:`not None`, the following naming schema is used for the files:
 
-                - `model_{model_num}.pt` if the model is one of the original models.
-                    model_num is the index of the model in the `models` argument.
+                - :code:`"model_{model_num}.pt"`
+                    if the model is one of the original models.
+                    :code:`model_num` is the index of the model
+                    in the :code:`models` argument.
                     The original models are not saved, except the best model.
 
-                - `interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt` if the model
-                    is interpolated. `m_i` and `m_i+1` are the indices of the models
-                    between which the interpolation is done.
-                    `percentage` is the percentage of the way through the interpolation.
-                    If it is small, the model is closer to `m_i`, and if it is large,
-                    the model is closer to `m_i+1`.
+                - :code:`"interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt"`
+                  if the model is interpolated.
+                  :math:`m_i` and :math:`m_{i+1}` are the indices of the models
+                  between which the interpolation is done.
+                  `percentage` is the percentage of the way through the interpolation.
+                  If it is small, the model is closer to :math:`m_i`,
+                  and if it is large, the model is closer to :math:`m_{i+1}`.
 
             save_all:
                 Whether to save all interpolated models, or just the best one.
