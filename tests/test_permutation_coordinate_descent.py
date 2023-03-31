@@ -33,15 +33,21 @@ def test_calculate_progress() -> None:
 
 
 class TestPermutationCoordinateDescent:
+    seed1 = 1234567
+    seed2 = 9948733
 
     @pytest.mark.skipif("--full-suite" not in sys.argv, reason="Slow test")
     def test_resnet18(self) -> None:
+        torch.manual_seed(self.seed1)
         model_a = resnet18()
+        torch.manual_seed(self.seed2)
         model_b = resnet18()
         self.common_tests(model_a, model_b, torch.randn(1, 3, 224, 224))
 
     def test_mlp(self) -> None:
+        torch.manual_seed(self.seed1)
         model_a = MLP(5)
+        torch.manual_seed(self.seed2)
         model_b = MLP(5)
         self.common_tests(model_a, model_b, torch.randn(5))
 
@@ -87,6 +93,9 @@ class TestPermutationCoordinateDescent:
     @staticmethod
     def model_distance(model_a: nn.Module, model_b: nn.Module) -> float:
         """Calculate the distance between two models."""
+        # TODO: this measure of distance might not be ideal.
+        #   It might be better to calculate the cost matrix between all parameters,
+        #   and then calculate the distance between the cost matrices and the identity.
         distance = 0.0
         for parameter_a, parameter_b in zip(
                 model_a.parameters(), model_b.parameters(), strict=True
