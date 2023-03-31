@@ -17,8 +17,6 @@ for name, param in model.named_parameters():
     ...
 ```
 
-```python
-
 
 ## `Rebasin`
 
