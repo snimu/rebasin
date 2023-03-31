@@ -7,7 +7,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from rebasin import recalculate_batch_norms
-from rebasin.util import get_inputs_labels
+from rebasin.util import contains_parameter, get_inputs_labels
 from tests.fixtures.models import SaveCallCount
 
 
@@ -77,3 +77,13 @@ def test_get_inputs_labels() -> None:
     assert torch.allclose(labels[0], out1)
     assert torch.allclose(labels[1], out2)
     assert torch.allclose(labels[2], out3)
+
+
+def test_contains_parameter() -> None:
+    p1 = nn.Parameter(torch.rand(3, 3))
+    p2 = nn.Parameter(torch.rand(3))
+    p3 = nn.Parameter(torch.rand(5))
+
+    assert contains_parameter((p1, p2), p1)
+    assert contains_parameter((p1, p2), p2)
+    assert not contains_parameter((p1, p2), p3)

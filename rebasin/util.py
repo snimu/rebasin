@@ -93,3 +93,24 @@ def get_inputs_labels(
     inputs = [batch[i] for i in input_indices]
     labels = [batch[i] for i in label_indices]
     return inputs, labels
+
+
+def contains_parameter(
+        parameters: Sequence[nn.Parameter], parameter: nn.Parameter
+) -> bool:
+    """
+    Check if a sequence of parameters contains a parameter.
+
+    This cannot be done via the normal `in` operator, because
+    `nn.Parameter`'s `__eq__` does not work for parameters of different shapes.
+
+    Args:
+        parameters:
+            The sequence of parameters.
+        parameter:
+            The parameter.
+
+    Returns:
+        Whether the sequence contains the parameter.
+    """
+    return any(param is parameter for param in parameters)
