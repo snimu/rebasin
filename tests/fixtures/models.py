@@ -18,11 +18,13 @@ class MLP(nn.Module):
 
         for i in range(num_layers):
             layers.append(
-                nn.Linear(in_features=in_features, out_features=in_features)
+                nn.Linear(
+                    in_features, out_features=in_features if i < num_layers - 1 else 1
+                )
             )
             layers.append(
                 nn.ReLU() if i < num_layers - 1
-                else nn.Softmax(dim=0)
+                else nn.Sequential()  # don't mess with last output
             )
 
         self.model = nn.Sequential(*layers)
@@ -30,7 +32,7 @@ class MLP(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         out: torch.Tensor = self.model(inputs)
-        return out[:self.out_features] if self.out_features > 0 else out
+        return out
 
 
 class SaveCallCount(nn.Module):
