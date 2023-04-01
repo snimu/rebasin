@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import copy
-import sys
 from typing import Any
 
-import pytest
 import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
@@ -36,7 +34,6 @@ class TestPermutationCoordinateDescent:
     seed1 = 1234567
     seed2 = 9948733
 
-    @pytest.mark.skipif("--full-suite" not in sys.argv, reason="Slow test")
     def test_resnet18(self) -> None:
         torch.manual_seed(self.seed1)
         model_a = resnet18()
