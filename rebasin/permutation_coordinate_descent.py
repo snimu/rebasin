@@ -133,7 +133,7 @@ class PermutationCoordinateDescent:
             ri, ci = linear_sum_assignment(
                 cost_tensor.cpu().detach().numpy(), maximize=True
             )
-            ri, ci = torch.from_numpy(ri), torch.from_numpy(ci)
+            ri, ci = torch.from_numpy(ri), torch.from_numpy(ci).to(cost_tensor.device)
 
             # Since we want to match features, we want to permute the columns only.
             # It should be the case that the rows naturally don't change.
