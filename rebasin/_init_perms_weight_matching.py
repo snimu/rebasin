@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Union
 
 import torch
 from torch import nn
@@ -13,7 +13,7 @@ from rebasin.structs import (
     Permutation,
 )
 
-NODE_TYPES = FunctionNode | ModuleNode | TensorNode
+NODE_TYPES = Union[FunctionNode, ModuleNode, TensorNode]  # noqa
 
 
 class PermutationInitializer:
