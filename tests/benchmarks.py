@@ -9,8 +9,13 @@ from time import perf_counter
 from typing import Any
 
 import torch
-from torch import nn
-from torchvision.models import resnet18, resnet50, resnet101  # type: ignore[import]
+from torchvision.models import (  # type: ignore[import]
+    resnet18,
+    resnet34,
+    resnet50,
+    resnet101,
+    resnet152,
+)
 from tqdm import tqdm
 
 from rebasin import PermutationCoordinateDescent
@@ -34,15 +39,17 @@ class BenchmarkPermutationCoordinateDescent:
 
     Results on a 2019 MacBook Air (1.6 GHz Intel Core i5, 8 GB 2133 MHz LPDDR3):
 
-    - ResNet18: 0.549 seconds
-    - ResNet50: 2.322 seconds
-    - ResNet101: 3.086 seconds
+    - ResNet18: 1.267 seconds
+    - ResNet34: 2.152 seconds
+    - ResNet50: 4.207 seconds
+    - ResNet101: 5.797 seconds
+    - ResNet152: 8.417 seconds
     """
     @staticmethod
     def benchmark_pcd(
             model_name: str,
-            model_a: nn.Module,
-            model_b: nn.Module,
+            model_a_type: Any,
+            model_b_type: Any,
             input_data: Any,
             iters: int = 100
     ) -> None:
@@ -51,7 +58,14 @@ class BenchmarkPermutationCoordinateDescent:
 
         for _ in tqdm(range(iters)):
             with Timer() as t:
-                pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
+                # Recreate the models each time to get a representative sample,
+                #   and to force permuting the weights.
+                # (If the models stay the same, at iteration 2,
+                #   model_b will already be permuted,
+                #   and no real permutation will occur.)
+                pcd = PermutationCoordinateDescent(
+                    model_a_type(), model_b_type(), input_data
+                )
                 pcd.calculate_permutations()
                 pcd.apply_permutations()
 
@@ -62,24 +76,38 @@ class BenchmarkPermutationCoordinateDescent:
     @classmethod
     def test_resnet18(cls, iters: int = 100) -> None:
         cls.benchmark_pcd(
-            "ResNet18", resnet18(), resnet18(), torch.randn(1, 3, 224, 224), iters
+            "ResNet18", resnet18, resnet18, torch.randn(1, 3, 224, 224), iters
+        )
+
+    @classmethod
+    def test_resnet34(cls, iters: int = 100) -> None:
+        cls.benchmark_pcd(
+            "ResNet34", resnet34, resnet34, torch.randn(1, 3, 224, 224), iters
         )
 
     @classmethod
     def test_resnet50(cls, iters: int = 100) -> None:
         cls.benchmark_pcd(
-            "ResNet50", resnet50(), resnet50(), torch.randn(1, 3, 224, 224), iters
+            "ResNet50", resnet50, resnet50, torch.randn(1, 3, 224, 224), iters
         )
 
     @classmethod
     def test_resnet101(cls, iters: int = 100) -> None:
         cls.benchmark_pcd(
-            "ResNet101", resnet101(), resnet101(), torch.randn(1, 3, 224, 224), iters
+            "ResNet101", resnet101, resnet101, torch.randn(1, 3, 224, 224), iters
+        )
+
+    @classmethod
+    def test_resnet152(cls, iters: int = 100) -> None:
+        cls.benchmark_pcd(
+            "ResNet152", resnet152, resnet152, torch.randn(1, 3, 224, 224), iters
         )
 
 
 if __name__ == "__main__":
     bench = BenchmarkPermutationCoordinateDescent()
-    bench.test_resnet18()
-    bench.test_resnet50()
-    bench.test_resnet101()
+    # bench.test_resnet18()
+    bench.test_resnet34()
+    # bench.test_resnet50()
+    # bench.test_resnet101()
+    bench.test_resnet152()
