@@ -6,7 +6,7 @@ import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 
-from rebasin.weight_matching.init_perms import PermutationInitializer
+from rebasin._wm_init_perms import PermutationInitializer
 
 
 def calculate_progress(

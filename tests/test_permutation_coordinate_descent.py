@@ -7,8 +7,8 @@ import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
-from rebasin.weight_matching import PermutationCoordinateDescent
-from rebasin.weight_matching.permutation_coordinate_descent import calculate_progress
+from rebasin import PermutationCoordinateDescent
+from rebasin.permutation_coordinate_descent import calculate_progress
 from tests.fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
 
 

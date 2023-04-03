@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import torch
@@ -8,7 +7,7 @@ from torch import nn
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
 from rebasin import util
-from rebasin.weight_matching.structs import (
+from rebasin.structs import (
     AxisType,
     ParameterInfo,
     Permutation,

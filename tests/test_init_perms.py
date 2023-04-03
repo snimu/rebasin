@@ -5,8 +5,8 @@ from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
 
 from rebasin import util
-from rebasin.weight_matching.init_perms import PermutationInitializer
-from rebasin.weight_matching.structs import AxisType
+from rebasin._wm_init_perms import PermutationInitializer
+from rebasin.structs import AxisType
 
 from .fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
 
