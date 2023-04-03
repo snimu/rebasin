@@ -66,10 +66,16 @@ class ModuleWithWeirdWeightAndBiasNames(nn.Module):
         self.defbiasghi = nn.Parameter(torch.randn(5))  # belongs to defweightghi
         self.biasjkl = nn.Parameter(torch.randn(5))  # belongs to jklweight
 
+        # Create a weight and bias that don't fit to test that they are not associated.
+        self.xyzweight = nn.Parameter(torch.randn(5, 5))
+        self.xyzbias = nn.Parameter(torch.randn(3))
+
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         x: torch.Tensor = inputs @ self.weightabc + self.abcbias
         x = nn.ReLU()(x)
         x = x @ self.defweightghi + self.defbiasghi
         x = nn.ReLU()(x)
         x = x @ self.jklweight + self.biasjkl
+        x = nn.ReLU()(x)
+        x = x @ self.xyzweight + self.xyzbias.sum()
         return x

@@ -208,19 +208,38 @@ class PermutationInitializer:
                 ):
                     bias = p_info
 
-            if bias is None:
+            if bias is None:  # If there is no fitting bias, create perm just for weight
                 permutation = Permutation(
                     perm_indices=torch.arange(param_info.param_b.shape[0]),
                     parameters=[param_info],
                     main_module_id=module_id,
                 )
-            else:
+                permutations.append(permutation)
+            elif (  # If names and shapes fit, associate weight and bias in one perm
+                    # scalar bias can always be added to any weight
+                    not list(bias.param_b.shape)
+                    or bias.param_b.shape[0] == 1
+                    # otherwise, the shapes must match
+                    or param_info.param_b.shape[0] == bias.param_b.shape[0]
+            ):
                 permutation = Permutation(
                     perm_indices=torch.arange(param_info.param_b.shape[0]),
                     parameters=[param_info, bias],
                     main_module_id=module_id,
                 )
-            permutations.append(permutation)
+                permutations.append(permutation)
+            else:  # If the shapes don't fit, just create two permutations
+                permutation1 = Permutation(
+                    perm_indices=torch.arange(param_info.param_b.shape[0]),
+                    parameters=[param_info],
+                    main_module_id=module_id,
+                )
+                permutation2 = Permutation(
+                    perm_indices=torch.arange(bias.param_b.shape[0]),
+                    parameters=[bias],
+                    main_module_id=module_id,
+                )
+                permutations.extend([permutation1, permutation2])
 
         return permutations
 

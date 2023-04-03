@@ -18,9 +18,15 @@ def test_init_permutations_weird_weight_bias_names() -> None:
     perm_init = PermutationInitializer(model_a, model_b, (x,))
 
     for perm in perm_init.permutations:
-        if perm.parameters[0].axis == 0:
-            assert len(perm.parameters) == 2  # every weight has a bias
-            names = [p.name for p in perm.parameters]
+        names = [p.name for p in perm.parameters]
+        if perm.parameters[0].name == "xyzweight":
+            assert len(perm.parameters) == 1  # should not be associated with xyzbias
+
+        if (
+                perm.parameters[0].axis == 0
+                and perm.parameters[0].name not in ("xyzweight", "xyzbias")
+        ):
+            assert len(perm.parameters) == 2  # every weight has a bias except xyz...
             if "weightabc" in names:
                 assert "abcbias" in names
             if "defweightghi" in names:
