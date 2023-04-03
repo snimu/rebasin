@@ -202,7 +202,10 @@ class PermutationInitializer:
             for p_info in groups[0]:
                 if "bias" not in p_info.name:
                     continue
-                if p_info.name[:-4] == param_info.name[:-6]:
+                if (
+                        p_info.name.replace("bias", "")
+                        == param_info.name.replace("weight", "")
+                ):
                     bias = p_info
 
             if bias is None:

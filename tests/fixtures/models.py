@@ -43,3 +43,33 @@ class SaveCallCount(nn.Module):
     def forward(self, x: Any) -> Any:
         self.call_count += 1
         return x
+
+
+class ModuleWithWeirdWeightAndBiasNames(nn.Module):
+    """
+    A model with weird weight and bias names.
+
+    Specifically, 'weight' and 'bias' appear in different positions
+    in their parameters' names.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.weightabc = nn.Parameter(torch.randn(5, 5))
+        self.defweightghi = nn.Parameter(torch.randn(5, 5))
+        self.jklweight = nn.Parameter(torch.randn(5, 5))
+
+        # Mix the order in bias names (except for one) to test that
+        #   the actual names are used, not the position of the words 'weight' and 'bias'
+        #   in those names.
+        self.abcbias = nn.Parameter(torch.randn(5))  # belongs to weightabc
+        self.defbiasghi = nn.Parameter(torch.randn(5))  # belongs to defweightghi
+        self.biasjkl = nn.Parameter(torch.randn(5))  # belongs to jklweight
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        x: torch.Tensor = inputs @ self.weightabc + self.abcbias
+        x = nn.ReLU()(x)
+        x = x @ self.defweightghi + self.defbiasghi
+        x = nn.ReLU()(x)
+        x = x @ self.jklweight + self.biasjkl
+        return x

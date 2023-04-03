@@ -8,7 +8,25 @@ from rebasin import util
 from rebasin.weight_matching.init_perms import PermutationInitializer
 from rebasin.weight_matching.structs import AxisType
 
-from .fixtures.models import MLP
+from .fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
+
+
+def test_init_permutations_weird_weight_bias_names() -> None:
+    model_a = ModuleWithWeirdWeightAndBiasNames()
+    model_b = ModuleWithWeirdWeightAndBiasNames()
+    x = torch.randn(5)
+    perm_init = PermutationInitializer(model_a, model_b, (x,))
+
+    for perm in perm_init.permutations:
+        if perm.parameters[0].axis == 0:
+            assert len(perm.parameters) == 2  # every weight has a bias
+            names = [p.name for p in perm.parameters]
+            if "weightabc" in names:
+                assert "abcbias" in names
+            if "defweightghi" in names:
+                assert "defbiasghi" in names
+            if "jklweight" in names:
+                assert "biasjkl" in names
 
 
 def test_init_permutations_multihead_attention() -> None:
