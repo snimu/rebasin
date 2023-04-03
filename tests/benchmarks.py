@@ -18,7 +18,7 @@ from torchvision.models import (  # type: ignore[import]
 )
 from tqdm import tqdm
 
-from rebasin import PermutationCoordinateDescent
+from rebasin.weight_matching import PermutationCoordinateDescent
 
 
 class Timer:
