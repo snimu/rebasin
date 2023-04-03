@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import torch
@@ -230,34 +231,36 @@ class PermutationInitializer:
     def _merge_permutations_recursive(
             self, nodes: list[NODE_TYPES], visited_nodes: set[NODE_TYPES]
     ) -> None:
-        for node in nodes:
-            children = list(node.children)
+        children: list[NODE_TYPES] = []
 
-            if not isinstance(node, ModuleNode):
-                self._merge_permutations_recursive(
-                    children, visited_nodes  # type: ignore[arg-type]
-                )
+        for node in nodes:
+            if node in visited_nodes:
                 continue
 
-            if node in visited_nodes:
+            visited_nodes.add(node)
+            children.extend(list(node.children))  # type: ignore[arg-type]
+
+            if not isinstance(node, ModuleNode):
                 continue
 
             permutations = self.id_to_permutation_init.get(node.compute_unit_id)
             if permutations is None:
-                self._merge_permutations_recursive(
-                    children, visited_nodes  # type: ignore[arg-type]
-                )
                 continue
 
-            visited_nodes.add(node)
             parent_modules = self._get_parent_modules(node)
 
             for permutation in permutations:
                 self._merge(parent_modules, permutation)
 
-            self._merge_permutations_recursive(
-                children, visited_nodes  # type: ignore[arg-type]
-            )
+        # Don't visit the same node twice
+        children = list(set(children))
+        for vnode in visited_nodes:
+            if vnode in children:
+                children.remove(vnode)
+
+        # No need to recurse if there is nothing to recurse on
+        if children:
+            self._merge_permutations_recursive(children, visited_nodes)
 
     def _get_parent_modules(self, node: NODE_TYPES) -> list[Permutation]:
         """Get the permutations of the parent modules of a node."""
