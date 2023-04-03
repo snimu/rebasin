@@ -14,7 +14,7 @@ from .fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
 def test_init_permutations_weird_weight_bias_names() -> None:
     model_a = ModuleWithWeirdWeightAndBiasNames()
     model_b = ModuleWithWeirdWeightAndBiasNames()
-    x = torch.randn(5)
+    x = torch.randn(15)
     perm_init = PermutationInitializer(model_a, model_b, (x,))
 
     for perm in perm_init.permutations:

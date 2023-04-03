@@ -55,19 +55,19 @@ class ModuleWithWeirdWeightAndBiasNames(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.weightabc = nn.Parameter(torch.randn(5, 5))
-        self.defweightghi = nn.Parameter(torch.randn(5, 5))
-        self.jklweight = nn.Parameter(torch.randn(5, 5))
+        self.weightabc = nn.Parameter(torch.randn(15, 15))
+        self.defweightghi = nn.Parameter(torch.randn(15, 15))
+        self.jklweight = nn.Parameter(torch.randn(15, 15))
 
         # Mix the order in bias names (except for one) to test that
         #   the actual names are used, not the position of the words 'weight' and 'bias'
         #   in those names.
-        self.abcbias = nn.Parameter(torch.randn(5))  # belongs to weightabc
-        self.defbiasghi = nn.Parameter(torch.randn(5))  # belongs to defweightghi
-        self.biasjkl = nn.Parameter(torch.randn(5))  # belongs to jklweight
+        self.abcbias = nn.Parameter(torch.randn(15))  # belongs to weightabc
+        self.defbiasghi = nn.Parameter(torch.randn(15))  # belongs to defweightghi
+        self.biasjkl = nn.Parameter(torch.randn(15))  # belongs to jklweight
 
         # Create a weight and bias that don't fit to test that they are not associated.
-        self.xyzweight = nn.Parameter(torch.randn(5, 5))
+        self.xyzweight = nn.Parameter(torch.randn(15, 15))
         self.xyzbias = nn.Parameter(torch.randn(3))
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:

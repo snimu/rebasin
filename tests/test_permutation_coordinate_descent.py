@@ -9,7 +9,7 @@ from torchvision.models import resnet18  # type: ignore[import]
 
 from rebasin import PermutationCoordinateDescent
 from rebasin.weight_matching.permutation_coordinate_descent import calculate_progress
-from tests.fixtures.models import MLP
+from tests.fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
 
 
 def test_calculate_progress() -> None:
@@ -58,6 +58,12 @@ class TestPermutationCoordinateDescent:
         value = torch.randn(embed_dim, num_heads, requires_grad=True)
 
         self.common_tests(model_a, model_b, (query, key, value))
+
+    def test_module_with_weird_weight_and_bias_names(self) -> None:
+        model_a = ModuleWithWeirdWeightAndBiasNames()
+        model_b = ModuleWithWeirdWeightAndBiasNames()
+
+        self.common_tests(model_a, model_b, torch.randn(15))
 
     def common_tests(
             self,
