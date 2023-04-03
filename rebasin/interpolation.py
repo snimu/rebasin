@@ -226,14 +226,13 @@ class LerpSimple(Interpolation):
     ) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
-                zip(self.models[:-1], self.models[1:], strict=True)
+                zip(self.models[:-1], self.models[1:])  # noqa: B905
         ):
             model_interp = copy.deepcopy(model1)
-            for param1, param2, param_interp in zip(
+            for param1, param2, param_interp in zip(  # noqa: B905
                     model1.parameters(),
                     model2.parameters(),
                     model_interp.parameters(),
-                    strict=True
             ):
                 param_interp.data = torch.lerp(param1, param2, percentage)
 

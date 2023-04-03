@@ -41,8 +41,8 @@ class PermutationInitializer:
         permutations: list[Permutation] = []
         id_to_perms: dict[int, list[Permutation]] = {}
 
-        for module_a, module_b in zip(
-                model_a.modules(), model_b.modules(), strict=True
+        for module_a, module_b in zip(  # noqa: B905
+                model_a.modules(), model_b.modules()
         ):
             parameters = self._get_parameter_info(module_a, module_b)
             if parameters is None:
@@ -64,8 +64,8 @@ class PermutationInitializer:
         assert type(module_a) == type(module_b), \
             "Failure in rebasin: Found modules of different types."
 
-        for (name_a, param_a), (name_b, param_b) in zip(
-            module_a.named_parameters(), module_b.named_parameters(), strict=True
+        for (name_a, param_a), (name_b, param_b) in zip(  # noqa: B905
+            module_a.named_parameters(), module_b.named_parameters()
         ):
             assert name_a == name_b, \
                 "Failure in rebasin: Found modules with different properties."
