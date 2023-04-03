@@ -103,7 +103,7 @@ def common_init_tests(
 
     # Bias isn't turned off in either resnet18 or MLP
     #   -> axis_type = AxisType.NEITHER should be present.
-    has_bias = (
+    has_bias = any(
         "bias" in name
         for m in modules
         for name, _ in m.named_parameters()
