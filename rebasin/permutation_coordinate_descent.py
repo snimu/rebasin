@@ -99,6 +99,7 @@ class PermutationCoordinateDescent:
                 axis = param_info.axis
                 w_a = param_info.param_a
                 w_b = param_info.param_b
+                cost_tensor = cost_tensor.to(w_a.device)
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
                 # To achieve this, we first move the axis of interest to the front.
