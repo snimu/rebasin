@@ -19,10 +19,9 @@ from torch import nn
 class Interpolation:
     def __init__(
             self, 
-            model_target: nn.Module, 
             models: Sequence[nn.Module | Path | str],
-            target_device: torch.device | str | None = None,
             model_devices: Sequence[torch.device | str] | None = None,
+            interp_device: torch.device | str | None = None,
     ) -> None:
         ...
 
@@ -30,8 +29,20 @@ class Interpolation:
 class PermutationCoordinateDescent:
     def __init__(
             self, 
-            model_a: nn.Module,
-            model_b: nn.Module,
+            model_a: nn.Module | Path | str,
+            model_b: nn.Module | Path | str,
+            input_data: Any,  # assumed to be on device_b
+            device_a: torch.device | str | None = None,
+            device_b: torch.device | str | None = None,
+    ) -> None:
+        ...
+
+
+class PermutationInitializer:
+    def __init__(
+            self, 
+            model_a: nn.Module | Path | str,
+            model_b: nn.Module | Path | str,
             input_data: Any,  # assumed to be on device_b
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
