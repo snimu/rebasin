@@ -99,7 +99,6 @@ class PermutationCoordinateDescent:
                 axis = param_info.axis
                 w_a = param_info.param_a
                 w_b = param_info.param_b
-                cost_tensor = cost_tensor.to(w_a.device)
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
                 # To achieve this, we first move the axis of interest to the front.
@@ -133,7 +132,7 @@ class PermutationCoordinateDescent:
             ri, ci = linear_sum_assignment(
                 cost_tensor.cpu().detach().numpy(), maximize=True
             )
-            ri, ci = torch.from_numpy(ri), torch.from_numpy(ci).to(cost_tensor.device)
+            ri, ci = torch.from_numpy(ri), torch.from_numpy(ci)
 
             # Since we want to match features, we want to permute the columns only.
             # It should be the case that the rows naturally don't change.
