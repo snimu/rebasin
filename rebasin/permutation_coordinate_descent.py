@@ -102,7 +102,7 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Initializing permutations...")
 
-        pinit = PermutationInitializer(model_a, model_b, input_data)
+        pinit = PermutationInitializer(model_a, model_b, input_data, verbose=verbose)
         self.permutations = pinit.permutations
 
         if verbose:
