@@ -19,6 +19,8 @@ class Interpolation:
             loss_fn: Any,
             train_dataloader: DataLoader[Any],
             val_dataloader: DataLoader[Any],
+            devices: Sequence[torch.device | str] | None = None,
+            device_interp: torch.device | str | None = None,
             input_indices: Sequence[int] | int = 0,
             output_indices: Sequence[int] | int = 1,
             savedir: Path | str | None = None,
@@ -29,6 +31,8 @@ class Interpolation:
             loss_fn,
             train_dataloader,
             val_dataloader,
+            devices,
+            device_interp,
             input_indices,
             output_indices,
             savedir,
@@ -42,12 +46,20 @@ class Interpolation:
         self.loss_fn = loss_fn
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
+        self.devices: Sequence[torch.device | str | None] = (
+            devices if devices is not None
+            else [None] * len(models)  # type: ignore[list-item]
+        )
+        self.device_interp = device_interp
         self.input_indices = input_indices
         self.output_indices = output_indices
         self.savedir = savedir
         self.save_all = save_all
 
-        self.losses_original = [self.evaluate_model(model) for model in self.models]
+        self.losses_original = [
+            self.evaluate_model(m, d)
+            for m, d in zip(self.models, self.devices)  # noqa: B905
+        ]
         self.losses_interpolated: list[float] = []
 
         min_idx = int(torch.argmin(torch.tensor(self.losses_original)))
@@ -63,12 +75,14 @@ class Interpolation:
     ) -> None:
         """Interpolate between the models and save the best one or all."""
 
-    def evaluate_model(self, model: nn.Module) -> float:
+    def evaluate_model(
+            self, model: nn.Module, device: torch.device | str | None = None
+    ) -> float:
         model.eval()
         loss = 0.0
         for batch in self.val_dataloader:
             inputs, labels = get_inputs_labels(
-                batch, self.input_indices, self.output_indices
+                batch, self.input_indices, self.output_indices, device=device
             )
             y_pred = model(*inputs)
             loss += float(self.loss_fn(y_pred, *labels))
@@ -80,6 +94,8 @@ class Interpolation:
             loss_fn: Any,
             train_dataloader: DataLoader[Any],
             val_dataloader: DataLoader[Any],
+            devices: Sequence[torch.device | str] | None,
+            device_interp: torch.device | str | None,
             input_indices: Sequence[int] | int,
             output_indices: Sequence[int] | int,
             savedir: Path | str | None,
@@ -93,6 +109,20 @@ class Interpolation:
 
         assert isinstance(train_dataloader, DataLoader)
         assert isinstance(val_dataloader, DataLoader)
+
+        if devices is None:
+            assert device_interp is None
+        else:
+            assert isinstance(devices, Sequence)
+            assert all(
+                isinstance(device, (str, torch.device)) for device in devices
+            )
+            assert len(devices) == len(models)
+
+        if device_interp is None:  # goes both ways
+            assert devices is None
+        else:
+            assert isinstance(device_interp, (str, torch.device))
 
         assert isinstance(input_indices, (int, Sequence))
         assert isinstance(output_indices, (int, Sequence))
@@ -228,21 +258,29 @@ class LerpSimple(Interpolation):
         for model_num, (model1, model2) in enumerate(
                 zip(self.models[:-1], self.models[1:])  # noqa: B905
         ):
-            model_interp = copy.deepcopy(model1)
+            model_interp = copy.deepcopy(model1).to(self.device_interp)
+
             for param1, param2, param_interp in zip(  # noqa: B905
                     model1.parameters(),
                     model2.parameters(),
                     model_interp.parameters(),
             ):
-                param_interp.data = torch.lerp(param1, param2, percentage)
+                param_interp.data = torch.lerp(
+                    param1.to(self.device_interp),
+                    param2.to(self.device_interp),
+                    percentage
+                )
 
             # Recalculate BatchNorm statistics
             recalculate_batch_norms(
-                model_interp, self.train_dataloader, self.input_indices
+                model_interp,
+                self.train_dataloader,
+                self.input_indices,
+                device=self.device_interp
             )
 
             # Evaluate
-            loss = self.evaluate_model(model_interp)
+            loss = self.evaluate_model(model_interp, device=self.device_interp)
             self.losses_interpolated.append(loss)
 
             # Save

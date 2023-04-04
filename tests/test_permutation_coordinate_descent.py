@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+import pytest
 import torch
 from torch import nn
 from torchvision.models import resnet18  # type: ignore[import]
@@ -10,6 +11,7 @@ from torchvision.models import resnet18  # type: ignore[import]
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
 from tests.fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
+from tests.fixtures.util import model_similarity
 
 
 def test_calculate_progress() -> None:
@@ -88,18 +90,27 @@ class TestPermutationCoordinateDescent:
         # - model_b is closer to model_a than it was before the optimization
         pcd.apply_permutations()
         assert (
-                self.model_similarity(model_a, model_b)
-                > self.model_similarity(model_a, model_b_old)
+                model_similarity(model_a, model_b)
+                > model_similarity(model_a, model_b_old)
         )
 
-    @staticmethod
-    def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:
-        """Calculate the distance between two models."""
-        total_dist = 0.0
 
-        for parameter_a, parameter_b in zip(
-                model_a.parameters(), model_b.parameters(), strict=True
-        ):
-            p_a, p_b = parameter_a.reshape(-1), parameter_b.reshape(-1)
-            total_dist += float(p_a @ p_b)
-        return abs(total_dist)
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU test")
+class TestPCDOnGPU:
+    @staticmethod
+    def test_mlp() -> None:
+        device_b = torch.device("cuda")
+        model_a, model_b = MLP(25), MLP(25).to(device_b)
+        model_b_old = copy.deepcopy(model_b)
+        input_data = torch.randn(25).to(device_b)
+
+        pcd = PermutationCoordinateDescent(
+            model_a, model_b, input_data, device_a="cpu", device_b=device_b
+        )
+        pcd.calculate_permutations()
+        pcd.apply_permutations()
+
+        assert (
+                model_similarity(model_a, model_b)
+                > model_similarity(model_a, model_b_old)
+        )

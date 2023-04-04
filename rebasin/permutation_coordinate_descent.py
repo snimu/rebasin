@@ -10,7 +10,10 @@ from rebasin._init_perms_weight_matching import PermutationInitializer
 
 
 def calculate_progress(
-        cost_mat: torch.Tensor, perm_old: torch.Tensor, perm_new: torch.Tensor
+        cost_mat: torch.Tensor,
+        perm_old: torch.Tensor,
+        perm_new: torch.Tensor,
+        device: torch.device | str | None = None,
 ) -> bool:
     """
     Compute the progress of the permutation.
@@ -22,11 +25,18 @@ def calculate_progress(
             The old permutation. Shape: (n,).
         perm_new:
             The new permutation. Shape: (n,).
+        device:
+            The device on which to perform the computation.
 
     Returns:
-        True if the new permutation moves the cost matrix closer to the identity matrix
-        than the old permutation does.
+        :code:`True` if the new permutation moves the cost matrix
+        closer to the identity matrix than the old permutation does,
+        else :code:`False`.
     """
+    cost_mat, perm_old, perm_new = (
+        cost_mat.to(device), perm_old.to(device), perm_new.to(device)
+    )
+
     # linear_sum_assignment finds the minimum cost by finding a permutation
     #   of the cost matrix that moves the highest values to the diagonal.
     # In other words, it tries to maximize the cost matrix's closeness
@@ -40,7 +50,7 @@ def calculate_progress(
     # In the end, the diagonal elements of the cost matrix are summed up.
     # The larger the sum, the closer the cost matrix is to the identity matrix,
     #   and the more progress has been made.
-    eye_ = torch.eye(cost_mat.shape[0])  # cost_mat is square
+    eye_ = torch.eye(cost_mat.shape[0]).to(device)  # cost_mat is square
     optimality_old = torch.einsum("ij,ij->i", cost_mat[:, perm_old], eye_).sum()
     optimality_new = torch.einsum("ij,ij->i", cost_mat[:, perm_new], eye_).sum()
 
@@ -49,7 +59,7 @@ def calculate_progress(
 
 
 class PermutationCoordinateDescent:
-    """
+    r"""
     Implements the permutation coordinate descent algorithm.
 
 
@@ -60,10 +70,29 @@ class PermutationCoordinateDescent:
             The model that will have its weights permuted.
         input_data:
             One batch of input data to trace the model's layout.
+            Assumed to be on :code:`device_b`.
+        device_a:
+            The device on which :code:`model_a` is located.
+            Both :code:`model_a` and :code:`model_b` must
+            either be :code:`None` or both be given.
+            The purpose of this argument is to allow the user to
+            use multiple GPUs if the models are so large that
+            only one fits on a single GPU.
+        device_b:
+            The device on which :code:`model_b` is located.
     """
 
-    def __init__(self, model_a: nn.Module, model_b: nn.Module, input_data: Any):
+    def __init__(
+            self,
+            model_a: nn.Module,
+            model_b: nn.Module,
+            input_data: Any,
+            device_a: torch.device | str | None = None,
+            device_b: torch.device | str | None = None
+    ) -> None:
         self.model_b = model_b
+        self.device_a = device_a
+        self.device_b = device_b
         pinit = PermutationInitializer(model_a, model_b, input_data)
         self.permutations = pinit.permutations
 
@@ -93,12 +122,13 @@ class PermutationCoordinateDescent:
         for i in torch.randperm(len(self.permutations)):
             permutation = self.permutations[i]
             n = len(permutation.perm_indices)
-            cost_tensor = torch.zeros((n, n))
+            cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
             for param_info in permutation.parameters:
                 axis = param_info.axis
-                w_a = param_info.param_a
-                w_b = param_info.param_b
+                w_a = param_info.param_a.to(self.device_b)
+                w_b = param_info.param_b.to(self.device_b)
+
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
                 # To achieve this, we first move the axis of interest to the front.
@@ -149,7 +179,10 @@ class PermutationCoordinateDescent:
             # If we calculate the progress and see that it is False,
             #   we can stop early.
             progress = progress or calculate_progress(
-                cost_tensor, perm_old=permutation.perm_indices, perm_new=ci
+                cost_tensor,
+                perm_old=permutation.perm_indices,
+                perm_new=ci,
+                device=self.device_b
             )
 
             # Update the permutation.

@@ -92,6 +92,37 @@ class TestInterpolation:
                 val_dataloader=0  # type: ignore[arg-type]
             )
 
+    def test_sanity_checks_devices(self) -> None:
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                loss_fn=loss_fn,
+                train_dataloader=self.train_dataloader,
+                val_dataloader=self.val_dataloader,
+                devices=["cpu", "cpu"],
+                device_interp=None
+            )
+
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                loss_fn=loss_fn,
+                train_dataloader=self.train_dataloader,
+                val_dataloader=self.val_dataloader,
+                devices=["cpu", "cpu", "cpu"],  # too long
+                device_interp="cpu"
+            )
+
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                loss_fn=loss_fn,
+                train_dataloader=self.train_dataloader,
+                val_dataloader=self.val_dataloader,
+                devices=None,
+                device_interp="cpu"
+            )
+
     def test_sanity_checks_input_indices(self) -> None:
         with pytest.raises(AssertionError):
             interp.Interpolation(
@@ -231,3 +262,22 @@ class TestLerpSimple:
         # With random data, there should be no duplicate losses.
         assert len(set(lerp.losses_original)) == 2
         assert len(set(lerp.losses_interpolated)) == 10
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU tests")
+class TestInterpolationGPU:
+    @staticmethod
+    def test_mlp() -> None:
+        models = [MLP(5).to("cuda"), MLP(5)]
+        devices = ["cuda", "cpu"]
+        lerp = interp.LerpSimple(
+            models=models,
+            loss_fn=loss_fn,
+            devices=devices,
+            device_interp="cuda",
+            train_dataloader=DataLoader(RandomDataset(shape=(5,), length=10)),
+            val_dataloader=DataLoader(RandomDataset(shape=(5,), length=2))
+        )
+        lerp.interpolate(steps=10)
+        assert len(lerp.losses_interpolated) == 10
+        assert len(lerp.losses_original) == 2

@@ -20,14 +20,14 @@ def test_recalculate_batch_norms() -> None:
     # Test whether recalculate_batch_norms works
     assert isinstance(bn.running_mean, torch.Tensor)
     assert torch.all(bn.running_mean == torch.zeros_like(bn.running_mean))
-    recalculate_batch_norms(model, dataloader, [0])
+    recalculate_batch_norms(model, dataloader, [0], None)
     assert torch.all(bn.running_mean != torch.zeros_like(bn.running_mean))
     assert scc.call_count > 0  # Test that scc works
 
-    # Test whether recalculate_batch_norms works in eval mode and resets it afterwards
+    # Test whether recalculate_batch_norms works in eval mode and resets it afterward
     model.eval()
     bn.running_mean = torch.zeros_like(bn.running_mean)  # reset running_mean
-    recalculate_batch_norms(model, dataloader, [0])
+    recalculate_batch_norms(model, dataloader, [0], None)
     assert model.training is False  # Reset to eval mode
     assert torch.all(bn.running_mean != torch.zeros_like(bn.running_mean))  # Did work
 
@@ -35,7 +35,7 @@ def test_recalculate_batch_norms() -> None:
     #   if there are no BatchNorms in the model
     scc.call_count = 0
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
-    recalculate_batch_norms(model, dataloader, 0)
+    recalculate_batch_norms(model, dataloader, 0, None)
     assert scc.call_count == 0
 
 

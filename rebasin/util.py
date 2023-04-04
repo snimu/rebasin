@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Any
 
+import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -11,6 +12,7 @@ def recalculate_batch_norms(
         model: nn.Module,
         dataloader: DataLoader[Any],
         input_indices: int | Sequence[int],
+        device: torch.device | str | None,
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
@@ -33,6 +35,8 @@ def recalculate_batch_norms(
             as inputs to the model's forward pass, you can specify the indices
             at which the inputs are located, in the order that they should be
             passed to the model.
+        device:
+            The device on which to run the model.
         *forward_args:
             Any additional positional arguments to pass to the model's forward  pass.
         **forward_kwargs:
@@ -52,7 +56,7 @@ def recalculate_batch_norms(
 
     for batch in dataloader:
         if isinstance(batch, Sequence):
-            inputs, _ = get_inputs_labels(batch, input_indices, 0)
+            inputs, _ = get_inputs_labels(batch, input_indices, 0, device)
         else:
             inputs = [batch]
         model(*inputs, *forward_args, **forward_kwargs)
@@ -64,7 +68,8 @@ def recalculate_batch_norms(
 def get_inputs_labels(
         batch: Any,
         input_indices: int | Sequence[int] = 0,
-        label_indices: int | Sequence[int] = 1
+        label_indices: int | Sequence[int] = 1,
+        device: torch.device | str | int | None = None
 ) -> tuple[list[Any], list[Any]]:
     """
     Get the inputs and outputs from a batch.
@@ -81,6 +86,8 @@ def get_inputs_labels(
             passed to the model.
         label_indices:
             Like `input_indices`, but for the labels.
+        device:
+            The device on which to run the model.
 
     Returns:
         The inputs and labels.
@@ -90,8 +97,16 @@ def get_inputs_labels(
     if isinstance(label_indices, int):
         label_indices = [label_indices]
 
-    inputs = [batch[i] for i in input_indices]
-    labels = [batch[i] for i in label_indices]
+    inputs = (
+        [batch[i].to(device) for i in input_indices]
+        if device is not None
+        else [batch[i] for i in input_indices]
+    )
+    labels = (
+        [batch[i].to(device) for i in label_indices]
+        if device is not None
+        else [batch[i] for i in label_indices]
+    )
     return inputs, labels
 
 

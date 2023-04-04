@@ -58,6 +58,7 @@ class Permutation:
             perm_indices:
                 The permutation indices.
         """
+        perm_indices = perm_indices.to(param.device)
         x = param.data.moveaxis(axis, 0)
         x = x[perm_indices]
         x = x.moveaxis(0, axis)
