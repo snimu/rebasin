@@ -73,9 +73,11 @@ class TestPermutationCoordinateDescent:
             model_b: nn.Module,
             input_data: Any,
     ) -> None:
+        model_b_old = copy.deepcopy(model_b)  # for comparison
         pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
         pcd.calculate_permutations()
-        model_b_old = copy.deepcopy(model_b)  # for comparison
+
+        assert pcd.permutations, "No permutations were found."
 
         # Check that there are some permutations different from the identity
         is_arange_list: list[bool] = []

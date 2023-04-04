@@ -264,47 +264,50 @@ class PermutationInitializer:
                 "PermutationInitializer: Merging permutations. This may take a while"
             )
 
-        root_nodes = list(
+        node_set = self._get_node_list()
+        for node in tqdm(node_set, disable=not self.verbose):
+            self._merge_with_parents(node)
+
+    def _get_node_list(self) -> set[ModuleNode]:
+        node_set: set[ModuleNode] = set()
+        visited_nodes: set[NODE_TYPES] = set()
+
+        work_nodes: set[NODE_TYPES] = set(
             draw_graph(self.model_b, self.input_data, depth=1e12).root_container
         )
-        self._merge_permutations_recursive(root_nodes, set())  # type: ignore[arg-type]
 
-    def _merge_permutations_recursive(
-            self, nodes: list[NODE_TYPES], visited_nodes: set[NODE_TYPES]
-    ) -> None:
-        if self.verbose:
-            print(".", end="", sep="", flush=True)
+        while work_nodes:
+            new_nodes: set[NODE_TYPES] = set()
 
-        children: list[NODE_TYPES] = []
+            for node in work_nodes:
+                visited_nodes.add(node)
 
-        for node in nodes:
-            if node in visited_nodes:
-                continue
+                for child in node.children:
+                    new_nodes.add(child)  # type: ignore[arg-type]
 
-            visited_nodes.add(node)
-            children.extend(list(node.children))  # type: ignore[arg-type]
+                if isinstance(node, ModuleNode):
+                    node_set.add(node)
 
-            if not isinstance(node, ModuleNode):
-                continue
+            work_nodes = new_nodes - visited_nodes
 
-            permutations = self.id_to_permutation_init.get(node.compute_unit_id)
-            if permutations is None:
-                continue
+        return node_set
 
-            parent_modules = self._get_parent_modules(node)
+    def _merge_with_parents(self, node: ModuleNode) -> None:
+        # Often, there is one permutation for several modules.
+        # This means that several permutations have to be merged,
+        #   because up to now, there was one permutation per module.
+        # To merge them, we look at the parents of each module,
+        #   and if they fit, merge the permutations.
+        # To avoid redundancy, permutations that are subsets of others
+        #   are marked and later removed.
+        permutations = self.id_to_permutation_init.get(node.compute_unit_id)
+        if permutations is None:
+            return
 
-            for permutation in permutations:
-                self._merge(parent_modules, permutation)
+        parent_modules = self._get_parent_modules(node)
 
-        # Don't visit the same node twice
-        children = list(set(children))
-        for vnode in visited_nodes:
-            if vnode in children:
-                children.remove(vnode)
-
-        # No need to recurse if there is nothing to recurse on
-        if children:
-            self._merge_permutations_recursive(children, visited_nodes)
+        for permutation in permutations:
+            self._merge(parent_modules, permutation)
 
     def _get_parent_modules(self, node: NODE_TYPES) -> list[Permutation]:
         """Get the permutations of the parent modules of a node."""
@@ -364,7 +367,7 @@ class PermutationInitializer:
 
         # Don't add permutations that are subsets of other permutations.
         if self._is_subset_of_other_permutation(new_perm):
-            return
+           return
 
         # If the new permutation is a superset of another permutation,
         #   mark the other permutation as redundant (for later removal).
