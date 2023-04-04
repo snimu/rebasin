@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from multiprocessing import Pool
 from typing import Any, Union
 
 import torch
@@ -53,12 +52,10 @@ class PermutationInitializer:
         if self.verbose:
             print("PermutationInitializer: Initializing permutations...")
 
-        loop = tqdm(
+        for module_a, module_b in tqdm(
             zip(model_a.modules(), model_b.modules()),  # noqa: B905
             disable=not self.verbose
-        )
-
-        for module_a, module_b in loop:
+        ):
             parameters = self._get_parameter_info(module_a, module_b)
             if parameters is None:
                 continue
