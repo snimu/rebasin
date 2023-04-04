@@ -265,9 +265,15 @@ class PermutationInitializer:
             )
 
         node_set = self._get_node_list()
-        loop = tqdm(node_set, disable=not self.verbose)
-        for node in loop:
+        loop = tqdm(enumerate(node_set), disable=not self.verbose)
+        for i, node in loop:
             self._merge_with_parents(node)
+
+            # Remove redundant permutations regularly.
+            # In very large models, they can take a lot of memory.
+            if i % 100 == 0:
+                self._remove_redundant_permutations()
+                self.redundant_permutation_indices = []
             loop.refresh()
 
     def _get_node_list(self) -> set[ModuleNode]:
