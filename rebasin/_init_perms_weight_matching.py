@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from multiprocessing import Pool
 from typing import Any, Union
 
 import torch
@@ -49,10 +50,13 @@ class PermutationInitializer:
         permutations: list[Permutation] = []
         id_to_perms: dict[int, list[Permutation]] = {}
 
-        loop = zip(model_a.modules(), model_b.modules())  # noqa: B905
         if self.verbose:
             print("PermutationInitializer: Initializing permutations...")
-            loop = tqdm(loop)  # type: ignore[assignment]
+
+        loop = tqdm(
+            zip(model_a.modules(), model_b.modules()),  # noqa: B905
+            disable=not self.verbose
+        )
 
         for module_a, module_b in loop:
             parameters = self._get_parameter_info(module_a, module_b)
