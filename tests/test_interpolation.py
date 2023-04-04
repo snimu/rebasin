@@ -281,3 +281,21 @@ class TestInterpolationGPU:
         lerp.interpolate(steps=10)
         assert len(lerp.losses_interpolated) == 10
         assert len(lerp.losses_original) == 2
+
+    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="Not enough GPUs")
+    def test_mlp_multi_gpu(self) -> None:
+        """Test whether it works with :code:`device_interp not in devices`."""
+
+        models = [MLP(5).to("cuda:0"), MLP(5).to("cuda:1")]
+        devices = ["cuda:0", "cuda:1"]
+        lerp = interp.LerpSimple(
+            models=models,
+            loss_fn=loss_fn,
+            devices=devices,
+            device_interp="cpu",
+            train_dataloader=DataLoader(RandomDataset(shape=(5,), length=10)),
+            val_dataloader=DataLoader(RandomDataset(shape=(5,), length=2))
+        )
+        lerp.interpolate(steps=10)
+        assert len(lerp.losses_interpolated) == 10
+        assert len(lerp.losses_original) == 2
