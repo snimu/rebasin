@@ -40,11 +40,11 @@ class BenchmarkPermutationCoordinateDescent:
 
     Results on a 2019 MacBook Air (1.6 GHz Intel Core i5, 8 GB 2133 MHz LPDDR3):
 
-    - ResNet18: 1.267 seconds
-    - ResNet34: 2.152 seconds
-    - ResNet50: 4.207 seconds
-    - ResNet101: 5.797 seconds
-    - ResNet152: 8.417 seconds
+    - ResNet18: 1.057 seconds
+    - ResNet34: 1.916 seconds
+    - ResNet50: 3.526 seconds
+    - ResNet101: 5.361 seconds
+    - ResNet152: 6.852 seconds
 
     Results on an A10 GPU (24 GB PCIe, 30vCPU with 200GB RAM):
 
@@ -113,23 +113,31 @@ class BenchmarkPermutationCoordinateDescent:
         )
 
     @classmethod
-    def test_large_mlp(cls, iters: int = 1) -> None:
+    def test_large_mlp(cls) -> None:
         model_a = MLP(1000, num_layers=5_000)
         model_b = MLP(1000, num_layers=5_000).to("cuda")
 
-        t0 = perf_counter()
-        pcd = PermutationCoordinateDescent(
-            model_a, model_b, torch.randn(1000).to("cuda")
-        )
-        pcd.calculate_permutations()
-        pcd.apply_permutations()
-        print(f"Large MLP: {perf_counter() - t0:.3f} seconds")
+        with Timer() as t_full:
+            pcd = PermutationCoordinateDescent(
+                model_a, model_b, torch.randn(1000).to("cuda")
+            )
+            print(f"Initialization: {t_full.start - perf_counter():.3f} seconds")
+
+            with Timer() as t_calc:
+                pcd.calculate_permutations()
+            print(f"Calculate permutations: {t_calc.elapsed:.3f} seconds")
+
+            with Timer() as t_apply:
+                pcd.apply_permutations()
+            print(f"Apply permutations: {t_apply.elapsed:.3f} seconds")
+
+        print(f"Large MLP: {t_full.elapsed:.3f} seconds")
 
 
 if __name__ == "__main__":
     bench = BenchmarkPermutationCoordinateDescent()
-    # bench.test_resnet18()
+    bench.test_resnet18()
     bench.test_resnet34()
-    # bench.test_resnet50()
-    # bench.test_resnet101()
+    bench.test_resnet50()
+    bench.test_resnet101()
     bench.test_resnet152()
