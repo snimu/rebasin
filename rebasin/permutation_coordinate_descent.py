@@ -5,6 +5,7 @@ from typing import Any
 import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
+from tqdm import tqdm
 
 from rebasin._init_perms_weight_matching import PermutationInitializer
 
@@ -80,6 +81,8 @@ class PermutationCoordinateDescent:
             only one fits on a single GPU.
         device_b:
             The device on which :code:`model_b` is located.
+        verbose:
+            If True, progress will be printed to the console.
     """
 
     def __init__(
@@ -88,13 +91,22 @@ class PermutationCoordinateDescent:
             model_b: nn.Module,
             input_data: Any,
             device_a: torch.device | str | None = None,
-            device_b: torch.device | str | None = None
+            device_b: torch.device | str | None = None,
+            verbose: bool = False
     ) -> None:
         self.model_b = model_b
         self.device_a = device_a
         self.device_b = device_b
+        self.verbose = verbose
+
+        if verbose:
+            print("Initializing permutations...")
+
         pinit = PermutationInitializer(model_a, model_b, input_data)
         self.permutations = pinit.permutations
+
+        if verbose:
+            print("Done.")
 
     def calculate_permutations(self, max_iterations: int = 100) -> None:
         """
@@ -105,7 +117,10 @@ class PermutationCoordinateDescent:
                 The maximum number of iterations.
         """
         # Calculate the permutations
-        for _i in range(max_iterations):
+        if self.verbose:
+            print("Calculating permutations...")
+        loop = tqdm(range(max_iterations)) if self.verbose else range(max_iterations)
+        for _i in loop:
             progress = self._calculate_permutations_step()
             if not progress:
                 break
@@ -195,5 +210,8 @@ class PermutationCoordinateDescent:
         Apply the calculated permutations to the model.
         """
         # Apply the permutations
-        for permutation in self.permutations:
+        if self.verbose:
+            print("Applying permutations...")
+        loop = tqdm(self.permutations) if self.verbose else self.permutations
+        for permutation in loop:
             permutation.apply()

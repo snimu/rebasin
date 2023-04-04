@@ -5,6 +5,7 @@ from typing import Any, Union
 import torch
 from torch import nn
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
+from tqdm import tqdm
 
 from rebasin import util
 from rebasin.structs import (
@@ -17,10 +18,17 @@ NODE_TYPES = Union[FunctionNode, ModuleNode, TensorNode]  # noqa
 
 
 class PermutationInitializer:
-    def __init__(self, model_a: nn.Module, model_b: nn.Module, input_data: Any) -> None:
+    def __init__(
+            self,
+            model_a: nn.Module,
+            model_b: nn.Module,
+            input_data: Any,
+            verbose: bool = False
+    ) -> None:
         self.model_a = model_a
         self.model_b = model_b
         self.input_data = input_data
+        self.verbose = verbose
 
         # A permutation for each axis of the weight (and bias) of each module.
         #   These will have to be merged.
@@ -41,9 +49,12 @@ class PermutationInitializer:
         permutations: list[Permutation] = []
         id_to_perms: dict[int, list[Permutation]] = {}
 
-        for module_a, module_b in zip(  # noqa: B905
-                model_a.modules(), model_b.modules()
-        ):
+        loop = zip(model_a.modules(), model_b.modules())  # noqa: B905
+        if self.verbose:
+            print("PermutationInitializer: Initializing permutations...")
+            loop = tqdm(loop)  # type: ignore[assignment]
+
+        for module_a, module_b in loop:
             parameters = self._get_parameter_info(module_a, module_b)
             if parameters is None:
                 continue
@@ -244,6 +255,11 @@ class PermutationInitializer:
 
     def _merge_permutations(self) -> None:
         """Update the permutations with their parents & children."""
+        if self.verbose:
+            print(
+                "PermutationInitializer: Merging permutations. This may take a while"
+            )
+
         root_nodes = list(
             draw_graph(self.model_b, self.input_data, depth=1e12).root_container
         )
@@ -252,6 +268,9 @@ class PermutationInitializer:
     def _merge_permutations_recursive(
             self, nodes: list[NODE_TYPES], visited_nodes: set[NODE_TYPES]
     ) -> None:
+        if self.verbose:
+            print(".", end="", sep="", flush=True)
+
         children: list[NODE_TYPES] = []
 
         for node in nodes:
