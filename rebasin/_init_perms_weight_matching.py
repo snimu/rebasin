@@ -52,10 +52,11 @@ class PermutationInitializer:
         if self.verbose:
             print("PermutationInitializer: Initializing permutations...")
 
-        for module_a, module_b in tqdm(
+        loop = tqdm(
             zip(model_a.modules(), model_b.modules()),  # noqa: B905
             disable=not self.verbose
-        ):
+        )
+        for module_a, module_b in loop:
             parameters = self._get_parameter_info(module_a, module_b)
             if parameters is None:
                 continue
@@ -64,6 +65,8 @@ class PermutationInitializer:
             perms = self._initialize_permutation_step(parameters, id(module_b))
             permutations.extend(perms)
             id_to_perms[id(module_b)] = perms
+
+            loop.refresh()
 
         return permutations, id_to_perms
 
@@ -262,8 +265,10 @@ class PermutationInitializer:
             )
 
         node_set = self._get_node_list()
-        for node in tqdm(node_set, disable=not self.verbose):
+        loop = tqdm(node_set, disable=not self.verbose)
+        for node in loop:
             self._merge_with_parents(node)
+            loop.refresh()
 
     def _get_node_list(self) -> set[ModuleNode]:
         node_set: set[ModuleNode] = set()

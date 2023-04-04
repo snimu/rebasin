@@ -119,10 +119,15 @@ class PermutationCoordinateDescent:
         # Calculate the permutations
         if self.verbose:
             print("Calculating permutations...")
-        for _i in tqdm(range(max_iterations), disable=not self.verbose):
+
+        loop = tqdm(range(max_iterations), disable=not self.verbose)
+        for _i in loop:
             progress = self._calculate_permutations_step()
             if not progress:
+                if self.verbose:
+                    print(f"Stopping early after {_i} steps.")
                 break
+            loop.refresh()
 
     def _calculate_permutations_step(self) -> bool:
         """
@@ -211,5 +216,8 @@ class PermutationCoordinateDescent:
         # Apply the permutations
         if self.verbose:
             print("Applying permutations...")
-        for permutation in tqdm(self.permutations, disable=not self.verbose):
+
+        loop = tqdm(self.permutations, disable=not self.verbose)
+        for permutation in loop:
             permutation.apply()
+            loop.refresh()
