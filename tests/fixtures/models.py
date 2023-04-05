@@ -79,3 +79,34 @@ class ModuleWithWeirdWeightAndBiasNames(nn.Module):
         x = nn.ReLU()(x)
         x = x @ self.xyzweight + self.xyzbias.sum()
         return x
+
+
+def mlp_3b() -> MLP:
+    """
+    A randomly initialized MLP with 4,000 layers.
+    Each layer has weights of shape (850, 850) and biases of shape (850,).
+
+    This leads to a total of 2,893,400,000 (2.89 billion) parameters.
+
+    The resulting model takes a :code:`torch.Tensor` of shape (850) as input
+    and returns a 1-dimensional :code:`torch.Tensor`.
+
+    |
+
+    Usage:
+
+    |
+
+    :code:`import torch`
+
+    :code:`from tests.fixtures.models import mlp_3b`
+
+    |
+
+    :code:`model = mlp_3b()`
+
+    :code:`x = torch.randn(850)`
+
+    :code:`y = model(x)`
+    """
+    return MLP(850, num_layers=4_000)
