@@ -48,6 +48,10 @@ class BenchmarkPermutationCoordinateDescent:
     - ResNet152: 60,192,808 (60.2 million) parameters
     - MLP3B: 2,893,400,000 (2.89 billion) parameters
 
+    ---------------
+    --- RESULTS ---
+    ---------------
+
     Results on a 2019 MacBook Air (1.6 GHz Intel Core i5, 8 GB 2133 MHz LPDDR3):
 
     - ResNet18: 1.057 seconds
@@ -212,7 +216,12 @@ class BenchmarkPermutationCoordinateDescent:
 
         with Timer() as t_full:
             pcd = PermutationCoordinateDescent(
-                model_a, model_b, torch.randn(850).to("cuda"), verbose=True
+                model_a=model_a,
+                model_b=model_b,
+                input_data=torch.randn(850).to("cuda"),
+                verbose=True,
+                device_a="cpu",
+                device_b="cuda"
             )
             print(f"Initialization: {t_full.start - perf_counter():.3f} seconds")
 
