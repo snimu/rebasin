@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import torch
@@ -145,8 +146,14 @@ class PermutationCoordinateDescent:
 
             for param_info in permutation.parameters:
                 axis = param_info.axis
-                w_a = param_info.param_a.to(self.device_b)
-                w_b = param_info.param_b.to(self.device_b)
+                # Copy so that the original parameter isn't moved to device_b.
+                # If this were not done, then in one of the later steps,
+                #   model_a would be almost completely on device_b.
+                # This is a problem because we want the models to be able to live
+                #   on different devices to allow for larger models
+                #   by splitting their memory needs.
+                w_a = copy.deepcopy(param_info.param_a).to(self.device_b)
+                w_b = copy.deepcopy(param_info.param_b).to(self.device_b)
 
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
