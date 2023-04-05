@@ -265,7 +265,8 @@ class LerpSimple(Interpolation):
             self.metrics_interpolated.append(metric)
 
             # Save
-            filename = f"interp_models_{model_num}_{model_num+1}_perc_{percentage}.pt"
+            filename = f"interp_models_{model_num}_{model_num+1}" \
+                       f"_perc_{percentage:.3f}.pt"
 
             is_best = (
                 metric < self.best_metric
