@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Any
 
 import torch
-from fixtures.models import MLP  # type: ignore[import]
+from fixtures.models import MLP, mlp_3b  # type: ignore[import]
 from torchvision.models import (  # type: ignore[import]
     resnet18,
     resnet34,
@@ -48,11 +48,11 @@ class BenchmarkPermutationCoordinateDescent:
 
     Results on an A10 GPU (24 GB PCIe, 30vCPU with 200GB RAM):
 
-    - Large MLP: 0.000 seconds
+    - MLP3B (model with 2,893,400,000 (2.89 billion) parameters): ?.??? seconds
         Of which:
-        - Initialization: 0.000 seconds
-        - Calculate permutations: 0.000 seconds
-        - Apply permutations: 0.000 seconds
+        - Initialization: ?.??? seconds
+        - Calculate permutations: ?.??? seconds
+        - Apply permutations: ?.??? seconds
     """
     @staticmethod
     def benchmark_pcd(
@@ -112,14 +112,14 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet152", resnet152, resnet152, torch.randn(1, 3, 224, 224), iters
         )
 
-    @classmethod
+    @classmethod 
     def test_large_mlp(cls) -> None:
-        model_a = MLP(1000, num_layers=5_000)
-        model_b = MLP(1000, num_layers=5_000).to("cuda")
+        model_a = mlp_3b()
+        model_b = mlp_3b().to("cuda")
 
         with Timer() as t_full:
             pcd = PermutationCoordinateDescent(
-                model_a, model_b, torch.randn(1000).to("cuda")
+                model_a, model_b, torch.randn(850).to("cuda")
             )
             print(f"Initialization: {t_full.start - perf_counter():.3f} seconds")
 
