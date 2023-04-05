@@ -60,7 +60,9 @@ class BenchmarkPermutationCoordinateDescent:
             model_a_type: Any,
             model_b_type: Any,
             input_data: Any,
-            iters: int = 100
+            iters: int = 100,
+            device_a: str = "cpu",
+            device_b: str = "cpu",
     ) -> None:
         print(f"Benchmarking PermutationCoordinateDescent on {model_name}...")
         elapsed = 0.0
@@ -73,7 +75,11 @@ class BenchmarkPermutationCoordinateDescent:
                 #   model_b will already be permuted,
                 #   and no real permutation will occur.)
                 pcd = PermutationCoordinateDescent(
-                    model_a_type(), model_b_type(), input_data
+                    model_a_type(),
+                    model_b_type(),
+                    input_data,
+                    device_a=device_a,
+                    device_b=device_b
                 )
                 pcd.calculate_permutations()
                 pcd.apply_permutations()
@@ -83,38 +89,68 @@ class BenchmarkPermutationCoordinateDescent:
         print(f"{model_name}: {elapsed / iters:.3f} seconds")
 
     @classmethod
-    def test_resnet18(cls, iters: int = 100) -> None:
+    def test_resnet18(cls, iters: int = 100, device: str = "cpu") -> None:
         cls.benchmark_pcd(
-            "ResNet18", resnet18, resnet18, torch.randn(1, 3, 224, 224), iters
+            "ResNet18",
+            resnet18,
+            resnet18,
+            torch.randn(1, 3, 224, 224),
+            iters,
+            device,
+            device
         )
 
     @classmethod
-    def test_resnet34(cls, iters: int = 100) -> None:
+    def test_resnet34(cls, iters: int = 100, device: str = "cpu") -> None:
         cls.benchmark_pcd(
-            "ResNet34", resnet34, resnet34, torch.randn(1, 3, 224, 224), iters
+            "ResNet34",
+            resnet34,
+            resnet34,
+            torch.randn(1, 3, 224, 224),
+            iters,
+            device,
+            device
         )
 
     @classmethod
-    def test_resnet50(cls, iters: int = 100) -> None:
+    def test_resnet50(cls, iters: int = 100, device: str = "cpu") -> None:
         cls.benchmark_pcd(
-            "ResNet50", resnet50, resnet50, torch.randn(1, 3, 224, 224), iters
+            "ResNet50",
+            resnet50,
+            resnet50,
+            torch.randn(1, 3, 224, 224),
+            iters,
+            device,
+            device
         )
 
     @classmethod
-    def test_resnet101(cls, iters: int = 100) -> None:
+    def test_resnet101(cls, iters: int = 100, device: str = "cpu") -> None:
         cls.benchmark_pcd(
-            "ResNet101", resnet101, resnet101, torch.randn(1, 3, 224, 224), iters
+            "ResNet101",
+            resnet101,
+            resnet101,
+            torch.randn(1, 3, 224, 224),
+            iters,
+            device,
+            device
         )
 
     @classmethod
-    def test_resnet152(cls, iters: int = 100) -> None:
+    def test_resnet152(cls, iters: int = 100, device: str = "cpu") -> None:
         cls.benchmark_pcd(
-            "ResNet152", resnet152, resnet152, torch.randn(1, 3, 224, 224), iters
+            "ResNet152",
+            resnet152,
+            resnet152,
+            torch.randn(1, 3, 224, 224),
+            iters,
+            device,
+            device
         )
 
     @classmethod 
-    def test_large_mlp(cls) -> None:
-        model_a = mlp_3b()
+    def test_mlp_3b(cls) -> None:
+        model_a = mlp_3b().to("cpu")
         model_b = mlp_3b().to("cuda")
 
         with Timer() as t_full:
