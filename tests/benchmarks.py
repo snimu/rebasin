@@ -5,6 +5,7 @@ different algorithms for re-basin, done on different models.
 
 from __future__ import annotations
 
+import csv
 from time import perf_counter
 from typing import Any
 
@@ -38,6 +39,15 @@ class BenchmarkPermutationCoordinateDescent:
     Benchmark the compute time of the PermutationCoordinateDescent algorithm
     on different models.
 
+    The following models are benchmarked (parameter counts measured using torchinfo):
+
+    - ResNet18: 11,689,512 (11.7 million) parameters
+    - ResNet34: 21,797,672 (21.8 million) parameters
+    - ResNet50: 25,557,032 (25.6 million) parameters
+    - ResNet101: 44,549,160 (44.5 million) parameters
+    - ResNet152: 60,192,808 (60.2 million) parameters
+    - MLP3B: 2,893,400,000 (2.89 billion) parameters
+
     Results on a 2019 MacBook Air (1.6 GHz Intel Core i5, 8 GB 2133 MHz LPDDR3):
 
     - ResNet18: 1.057 seconds
@@ -48,7 +58,13 @@ class BenchmarkPermutationCoordinateDescent:
 
     Results on an A10 GPU (24 GB PCIe, 30vCPU with 200GB RAM):
 
-    - MLP3B (model with 2,893,400,000 (2.89 billion) parameters): ?.??? seconds
+    - ResNet18: 0.342 seconds
+    - ResNet34: 0.565 seconds
+    - ResNet50: 1.197 seconds
+    - ResNet101: 1.792 seconds
+    - ResNet152: 2.252 seconds
+
+    - MLP3B: ?.??? seconds
         Of which:
         - Initialization: ?.??? seconds
         - Calculate permutations: ?.??? seconds
@@ -63,9 +79,11 @@ class BenchmarkPermutationCoordinateDescent:
             iters: int = 100,
             device_a: str = "cpu",
             device_b: str = "cpu",
+            savefile: str | None = None
     ) -> None:
         print(f"Benchmarking PermutationCoordinateDescent on {model_name}...")
         elapsed = 0.0
+        all_elapsed: list[float] = []
 
         for _ in tqdm(range(iters)):
             with Timer() as t:
@@ -85,11 +103,25 @@ class BenchmarkPermutationCoordinateDescent:
                 pcd.apply_permutations()
 
             elapsed += t.elapsed
+            all_elapsed.append(t.elapsed)
 
         print(f"{model_name}: {elapsed / iters:.3f} seconds")
 
+        if savefile is not None:
+            assert savefile.endswith(".csv")
+
+            with open(savefile, "w") as file:
+                writer = csv.writer(file)
+                writer.writerow(list(range(iters)))
+                writer.writerow(all_elapsed)
+
     @classmethod
-    def test_resnet18(cls, iters: int = 100, device: str = "cpu") -> None:
+    def test_resnet18(
+            cls,
+            iters: int = 100,
+            device: str = "cpu",
+            savefile: str | None = None
+    ) -> None:
         cls.benchmark_pcd(
             "ResNet18",
             resnet18,
@@ -97,11 +129,17 @@ class BenchmarkPermutationCoordinateDescent:
             torch.randn(1, 3, 224, 224),
             iters,
             device,
-            device
+            device,
+            savefile,
         )
 
     @classmethod
-    def test_resnet34(cls, iters: int = 100, device: str = "cpu") -> None:
+    def test_resnet34(
+            cls,
+            iters: int = 100,
+            device: str = "cpu",
+            savefile: str | None = None
+    ) -> None:
         cls.benchmark_pcd(
             "ResNet34",
             resnet34,
@@ -109,11 +147,17 @@ class BenchmarkPermutationCoordinateDescent:
             torch.randn(1, 3, 224, 224),
             iters,
             device,
-            device
+            device,
+            savefile,
         )
 
     @classmethod
-    def test_resnet50(cls, iters: int = 100, device: str = "cpu") -> None:
+    def test_resnet50(
+            cls,
+            iters: int = 100,
+            device: str = "cpu",
+            savefile: str | None = None
+    ) -> None:
         cls.benchmark_pcd(
             "ResNet50",
             resnet50,
@@ -121,11 +165,17 @@ class BenchmarkPermutationCoordinateDescent:
             torch.randn(1, 3, 224, 224),
             iters,
             device,
-            device
+            device,
+            savefile,
         )
 
     @classmethod
-    def test_resnet101(cls, iters: int = 100, device: str = "cpu") -> None:
+    def test_resnet101(
+            cls,
+            iters: int = 100,
+            device: str = "cpu",
+            savefile: str | None = None
+    ) -> None:
         cls.benchmark_pcd(
             "ResNet101",
             resnet101,
@@ -133,11 +183,17 @@ class BenchmarkPermutationCoordinateDescent:
             torch.randn(1, 3, 224, 224),
             iters,
             device,
-            device
+            device,
+            savefile,
         )
 
     @classmethod
-    def test_resnet152(cls, iters: int = 100, device: str = "cpu") -> None:
+    def test_resnet152(
+            cls,
+            iters: int = 100,
+            device: str = "cpu",
+            savefile: str | None = None
+    ) -> None:
         cls.benchmark_pcd(
             "ResNet152",
             resnet152,
@@ -145,17 +201,18 @@ class BenchmarkPermutationCoordinateDescent:
             torch.randn(1, 3, 224, 224),
             iters,
             device,
-            device
+            device,
+            savefile,
         )
 
     @classmethod 
-    def test_mlp_3b(cls) -> None:
+    def test_mlp_3b(cls, savefile: str | None = None) -> None:
         model_a = mlp_3b().to("cpu")
         model_b = mlp_3b().to("cuda")
 
         with Timer() as t_full:
             pcd = PermutationCoordinateDescent(
-                model_a, model_b, torch.randn(850).to("cuda")
+                model_a, model_b, torch.randn(850).to("cuda"), verbose=True
             )
             print(f"Initialization: {t_full.start - perf_counter():.3f} seconds")
 
@@ -168,12 +225,24 @@ class BenchmarkPermutationCoordinateDescent:
             print(f"Apply permutations: {t_apply.elapsed:.3f} seconds")
 
         print(f"Large MLP: {t_full.elapsed:.3f} seconds")
+        if savefile is not None:
+            assert savefile.endswith(".csv")
+
+            with open(savefile, "w") as file:
+                writer = csv.writer(file)
+                writer.writerow(["Full", "Calc", "Apply"])
+                writer.writerow([t_full.elapsed, t_calc.elapsed, t_apply.elapsed])
 
 
 if __name__ == "__main__":
     bench = BenchmarkPermutationCoordinateDescent()
-    bench.test_resnet18()
-    bench.test_resnet34()
-    bench.test_resnet50()
-    bench.test_resnet101()
-    bench.test_resnet152()
+    iters = 100
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    bench.test_resnet18(iters, device)
+    bench.test_resnet34(iters, device)
+    bench.test_resnet50(iters, device)
+    bench.test_resnet101(iters, device)
+    bench.test_resnet152(iters, device)
+
+    if torch.cuda.is_available():
+        bench.test_mlp_3b(savefile="results.csv")
