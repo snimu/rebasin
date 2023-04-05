@@ -16,25 +16,23 @@ class Interpolation:
     def __init__(
             self,
             models: Sequence[torch.nn.Module],
-            loss_fn: Any,
-            train_dataloader: DataLoader[Any],
-            val_dataloader: DataLoader[Any],
+            eval_fn: Any,
+            eval_mode: str = "min",
+            train_dataloader: DataLoader[Any] | None = None,
             devices: Sequence[torch.device | str] | None = None,
             device_interp: torch.device | str | None = None,
             input_indices: Sequence[int] | int = 0,
-            output_indices: Sequence[int] | int = 1,
             savedir: Path | str | None = None,
             save_all: bool = False,
     ) -> None:
         self._sanity_checks(
             models,
-            loss_fn,
+            eval_fn,
+            eval_mode,
             train_dataloader,
-            val_dataloader,
             devices,
             device_interp,
             input_indices,
-            output_indices,
             savedir,
             save_all
 
@@ -43,29 +41,29 @@ class Interpolation:
             savedir = Path(savedir)
 
         self.models = models
-        self.loss_fn = loss_fn
+        self.eval_fn = eval_fn
+        self.eval_mode = eval_mode
+        self.idx_fn = torch.argmax if eval_mode == "max" else torch.argmin
         self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
         self.devices: Sequence[torch.device | str | None] = (
             devices if devices is not None
             else [None] * len(models)  # type: ignore[list-item]
         )
         self.device_interp = device_interp
         self.input_indices = input_indices
-        self.output_indices = output_indices
         self.savedir = savedir
         self.save_all = save_all
 
-        self.losses_original = [
-            self.evaluate_model(m, d)
+        self.metrics_models = [
+            self.eval_fn(m, d)
             for m, d in zip(self.models, self.devices)  # noqa: B905
         ]
-        self.losses_interpolated: list[float] = []
+        self.metrics_interpolated: list[float] = []
 
-        min_idx = int(torch.argmin(torch.tensor(self.losses_original)))
-        self.best_loss = self.losses_original[min_idx]
-        self.best_model = self.models[min_idx]
-        self.best_model_name = f"model_{min_idx}.pt"
+        best_idx = int(self.idx_fn(torch.tensor(self.metrics_models)))
+        self.best_metric = self.metrics_models[best_idx]
+        self.best_model = self.models[best_idx]
+        self.best_model_name = f"model_{best_idx}.pt"
 
     def interpolate(
             self,
@@ -75,29 +73,15 @@ class Interpolation:
     ) -> None:
         """Interpolate between the models and save the best one or all."""
 
-    def evaluate_model(
-            self, model: nn.Module, device: torch.device | str | None = None
-    ) -> float:
-        model.eval()
-        loss = 0.0
-        for batch in self.val_dataloader:
-            inputs, labels = get_inputs_labels(
-                batch, self.input_indices, self.output_indices, device=device
-            )
-            y_pred = model(*inputs)
-            loss += float(self.loss_fn(y_pred, *labels))
-        return loss / len(self.val_dataloader)
-
     @staticmethod
     def _sanity_checks(
             models: Sequence[torch.nn.Module],
-            loss_fn: Any,
-            train_dataloader: DataLoader[Any],
-            val_dataloader: DataLoader[Any],
+            eval_fn: Any,
+            eval_mode: str,
+            train_dataloader: DataLoader[Any] | None,
             devices: Sequence[torch.device | str] | None,
             device_interp: torch.device | str | None,
             input_indices: Sequence[int] | int,
-            output_indices: Sequence[int] | int,
             savedir: Path | str | None,
             save_all: bool = False,
     ) -> None:
@@ -105,10 +89,11 @@ class Interpolation:
         assert all(isinstance(model, nn.Module) for model in models), \
             "All models must be a subclass of nn.Module"
 
-        assert callable(loss_fn), "Loss function must be callable"
+        assert callable(eval_fn), "Eval function must be callable"
+        assert isinstance(eval_mode, str)
+        assert eval_mode in ["min", "max"], "Eval mode must be 'min' or 'max'"
 
-        assert isinstance(train_dataloader, DataLoader)
-        assert isinstance(val_dataloader, DataLoader)
+        assert isinstance(train_dataloader, (DataLoader, type(None)))
 
         if devices is None:
             assert device_interp is None
@@ -125,12 +110,8 @@ class Interpolation:
             assert isinstance(device_interp, (str, torch.device))
 
         assert isinstance(input_indices, (int, Sequence))
-        assert isinstance(output_indices, (int, Sequence))
-
         if isinstance(input_indices, Sequence):
             assert all(isinstance(i, int) for i in input_indices)
-        if isinstance(output_indices, Sequence):
-            assert all(isinstance(i, int) for i in output_indices)
 
         assert isinstance(savedir, (Path, str, type(None)))
         assert isinstance(save_all, bool)
@@ -214,7 +195,6 @@ class LerpSimple(Interpolation):
         """
         # SANITY CHECKS AND DEFAULT SETTINGS
         assert isinstance(savedir, (Path, str, type(None)))
-
         if savedir is None:
             savedir = self.savedir
         elif isinstance(savedir, str):
@@ -272,22 +252,28 @@ class LerpSimple(Interpolation):
                 )
 
             # Recalculate BatchNorm statistics
-            recalculate_batch_norms(
-                model_interp,
-                self.train_dataloader,
-                self.input_indices,
-                device=self.device_interp
-            )
+            if self.train_dataloader is not None:
+                recalculate_batch_norms(
+                    model_interp,
+                    self.train_dataloader,
+                    self.input_indices,
+                    device=self.device_interp
+                )
 
             # Evaluate
-            loss = self.evaluate_model(model_interp, device=self.device_interp)
-            self.losses_interpolated.append(loss)
+            metric = self.eval_fn(model_interp, self.device_interp)
+            self.metrics_interpolated.append(metric)
 
             # Save
             filename = f"interp_models_{model_num}_{model_num+1}_perc_{percentage}.pt"
 
-            if loss < self.best_loss:
-                self.best_loss = loss
+            is_best = (
+                metric < self.best_metric
+                if self.eval_mode == "min"
+                else metric > self.best_metric
+            )
+            if is_best:
+                self.best_metric = metric
                 self.best_model = model_interp
                 self.best_model_name = filename  # for later saving if not save_all
 
