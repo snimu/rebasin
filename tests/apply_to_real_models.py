@@ -138,10 +138,14 @@ class ImageNetEval:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.train_dl = DataLoader(
-            ImageNet("data", split="train", transform=weights.transforms())
+            ImageNet(
+                "data", split="train", transform=weights.IMAGENET1K_V1.transforms()
+            )
         )
         self.val_dl = DataLoader(
-            ImageNet("data", split="val", transform=weights.transforms())
+            ImageNet(
+                "data", split="val", transform=weights.IMAGENET1K_V1.transforms()
+            )
         )
 
         model_a = model_type(weights=weights.IMAGENET1K_V2).to(device)
