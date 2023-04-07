@@ -177,22 +177,6 @@ class ImageNetEval:
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
         }
 
-        if verbose:
-            print("Interpolate between model_a and model_b (original weights)")
-
-        # Interpolate between original models
-        lerp = LerpSimple(
-            models=(model_a, model_b),
-            devices=[device, device],
-            device_interp=device,
-            eval_fn=self.eval_fn,
-            verbose=verbose
-        )
-        lerp.interpolate(steps=20)
-        results["a_b_original"] = lerp.metrics_interpolated
-        loss_a = lerp.metrics_models[0]
-        loss_b_original = lerp.metrics_models[1]
-
         # Rebasin
         if verbose:
             print("\nRebasin")
@@ -209,6 +193,22 @@ class ImageNetEval:
         recalculate_batch_norms(
             model_b, self.train_dl, input_indices=0, device=device, verbose=verbose
         )
+
+        if verbose:
+            print("Interpolate between model_a and model_b (original weights)")
+
+        # Interpolate between original models
+        lerp = LerpSimple(
+            models=(model_a, original_model_b),
+            devices=[device, device],
+            device_interp=device,
+            eval_fn=self.eval_fn,
+            verbose=verbose
+        )
+        lerp.interpolate(steps=20)
+        results["a_b_original"] = lerp.metrics_interpolated
+        loss_a = lerp.metrics_models[0]
+        loss_b_original = lerp.metrics_models[1]
 
         # Interpolate between models with rebasin
         if verbose:
