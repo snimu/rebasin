@@ -61,6 +61,21 @@ def recalculate_batch_norms(
     training = model.training
     model.train()
 
+    # Reset the running mean and variance
+    for module in model.modules():
+        if (
+                not isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
+                or not hasattr(module, "running_mean")
+                or not hasattr(module, "running_var")
+                or module.running_mean is None
+                or module.running_var is None
+        ):
+            continue
+
+        model.running_mean = torch.zeros_like(module.running_mean)
+        model.running_var = torch.zeros_like(module.running_var)
+
+    # Recalculate the running mean and variance
     for batch in tqdm(dataloader, disable=not verbose):
         if isinstance(batch, Sequence):
             inputs, _ = get_inputs_labels(batch, input_indices, 0, device)
