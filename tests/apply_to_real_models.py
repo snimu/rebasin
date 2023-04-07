@@ -128,11 +128,13 @@ class ImageNetEval:
             if model.__name__ in self.hparams.models:
                 yield model, weights
 
-    def eval_fn(self, model: nn.Module) -> float:
+    def eval_fn(self, model: nn.Module, device: str | torch.device) -> float:
         losses: list[float] = []
         loss_fn = nn.CrossEntropyLoss()
         assert self.val_dl is not None  # for mypy
         for inputs, labels in self.val_dl:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             outputs = model(inputs)
             loss = loss_fn(outputs, labels)
             losses.append(loss.item())
