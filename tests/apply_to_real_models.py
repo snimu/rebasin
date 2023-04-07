@@ -9,6 +9,7 @@ import argparse
 import csv
 import os
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -137,16 +138,17 @@ class ImageNetEval:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
+        root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.train_dl = DataLoader(
             ImageNet(
-                "tests/data",
+                root_dir,
                 split="train",
                 transform=weights.IMAGENET1K_V1.transforms()
             )
         )
         self.val_dl = DataLoader(
             ImageNet(
-                "tests/data",
+                root_dir,
                 split="val",
                 transform=weights.IMAGENET1K_V1.transforms()
             )
