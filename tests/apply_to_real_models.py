@@ -170,7 +170,9 @@ class ImageNetEval:
         }
 
         # Interpolate between original models
-        lerp = LerpSimple(models=(model_a, model_b), eval_fn=self.eval_fn)
+        lerp = LerpSimple(
+            models=(model_a, model_b), devices=[device, device], eval_fn=self.eval_fn
+        )
         lerp.interpolate(steps=20)
         results["a_b_original"] = lerp.metrics_interpolated
         loss_a = lerp.metrics_models[0]
@@ -187,6 +189,7 @@ class ImageNetEval:
         # Interpolate between models with rebasin
         lerp = LerpSimple(
             models=(model_a, model_b),
+            devices=[device, device],
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl
         )
@@ -198,6 +201,7 @@ class ImageNetEval:
         original_model_b = model_type(weights=weights.IMAGENET1K_V1).to(device)
         lerp = LerpSimple(
             models=(original_model_b, model_b),
+            devices=[device, device],
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl
         )
