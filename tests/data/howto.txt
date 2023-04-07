@@ -1,0 +1,2 @@
+git clone https://github.com/raminrasoulinezhad/torchvision.git
+mv torchvision/ILSVRC2012_devkit_t12.tar.gz rebasin/tests/data
