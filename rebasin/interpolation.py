@@ -63,12 +63,6 @@ class Interpolation:
         if self.verbose:
             print("Evaluating given models...")
 
-        if self.train_dataloader is not None:
-            for model, device in zip(self.models, self.devices):  # noqa
-                recalculate_batch_norms(
-                    model, self.train_dataloader, self.input_indices, device, verbose
-                )
-
         self.metrics_models = [
             self.eval_fn(m, d)
             for m, d in tqdm(
