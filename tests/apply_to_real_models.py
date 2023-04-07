@@ -95,7 +95,7 @@ MODELS_AND_WEIGHTS = (  # All the models with V1 and V2 weights
 class ImageNetEval:
     def __init__(self) -> None:
         parser = argparse.ArgumentParser()
-        parser.add_argument("-m", "--models", type=list[str], required=False)
+        parser.add_argument("-m", "--models", type=str, nargs='*')
         parser.add_argument("-a", "--all", action="store_true", default=False)
 
         self.hparams = parser.parse_args()
