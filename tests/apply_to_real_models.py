@@ -251,6 +251,13 @@ class ImageNetEval:
             writer.writerows(rows)
 
     def run(self) -> None:
+        """Run the evaluation.
+
+        Attention! All models have BatchNorm layers. This means that the
+        interpolation will take long time, because their statistics have
+        to be recalculated (meaning that the entire training set has to be
+        passed through the model for every interpolation step).
+        """
         for i, (model_type, weights) in enumerate(MODELS_AND_WEIGHTS):
             if model_type.__name__ not in self.hparams.models:
                 continue
