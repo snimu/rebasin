@@ -97,6 +97,7 @@ class ImageNetEval:
         parser = argparse.ArgumentParser()
         parser.add_argument("-m", "--models", type=str, nargs='*')
         parser.add_argument("-a", "--all", action="store_true", default=False)
+        parser.add_argument("-v", "--verbose", action="store_true", default=True)
 
         self.hparams = parser.parse_args()
 
@@ -253,14 +254,22 @@ class ImageNetEval:
             writer = csv.writer(f)
             writer.writerows(rows)
 
-    def run(self, verbose: bool = True) -> None:
+    def run(self) -> None:
         for model_type, weights in self.model_weight_generator():
-            if verbose:
+            if self.hparams.verbose:
                 print(
                     f"\n\nMeasuring weight matching for {model_type.__name__.upper()}"
                 )
-            self.measure_weight_matching(model_type, weights, verbose)
+            self.measure_weight_matching(model_type, weights, self.hparams.verbose)
 
 
 if __name__ == "__main__":
-    ImageNetEval().run()
+    evaluator = ImageNetEval()
+
+    if evaluator.hparams.verbose:
+        print("Evaluating models:\n\n[")
+        for mname in evaluator.hparams.models:
+            print(f"    {mname},")
+        print("]\n")
+
+    evaluator.run()
