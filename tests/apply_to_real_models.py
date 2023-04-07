@@ -255,7 +255,7 @@ class ImageNetEval:
 
             if self.hparams.verbose:
                 print(
-                    f"\n\n{i}/{len(MODELS_AND_WEIGHTS)}: "
+                    f"\n\n{i+1}/{len(MODELS_AND_WEIGHTS)}: "
                     f"Measuring weight matching for {model_type.__name__.upper()}"
                 )
             self.measure_weight_matching(model_type, weights, self.hparams.verbose)
