@@ -8,6 +8,7 @@ from typing import Any
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from .util import get_inputs_labels, recalculate_batch_norms
 
@@ -24,6 +25,7 @@ class Interpolation:
             input_indices: Sequence[int] | int = 0,
             savedir: Path | str | None = None,
             save_all: bool = False,
+            verbose: bool = False,
     ) -> None:
         self._sanity_checks(
             models,
@@ -53,6 +55,7 @@ class Interpolation:
         self.input_indices = input_indices
         self.savedir = savedir
         self.save_all = save_all
+        self.verbose = verbose
 
         self.metrics_models = [
             self.eval_fn(m, d)
@@ -205,8 +208,11 @@ class LerpSimple(Interpolation):
 
         assert isinstance(save_all, bool)
 
+        if self.verbose:
+            print("Interpolating between models...")
+
         # INTERPOLATION
-        for step in range(steps):
+        for step in tqdm(range(steps), disable=not self.verbose):
             # Interpolate between the two models
             # (step + 1) so that it never starts at zero percent.
             # (steps + 2) so that it never ends at 100 percent.

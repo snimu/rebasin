@@ -140,7 +140,9 @@ class ImageNetEval:
             losses.append(loss.item())
         return sum(losses) / len(losses)
 
-    def measure_weight_matching(self, model_type: Any, weights: Any) -> None:
+    def measure_weight_matching(
+            self, model_type: Any, weights: Any, verbose: bool
+    ) -> None:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -169,12 +171,16 @@ class ImageNetEval:
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
         }
 
+        if verbose:
+            print("Interpolate between model_a and model_b (original weights)")
+
         # Interpolate between original models
         lerp = LerpSimple(
             models=(model_a, model_b),
             devices=[device, device],
             device_interp=device,
-            eval_fn=self.eval_fn
+            eval_fn=self.eval_fn,
+            verbose=verbose
         )
         lerp.interpolate(steps=20)
         results["a_b_original"] = lerp.metrics_interpolated
@@ -182,33 +188,45 @@ class ImageNetEval:
         loss_b_original = lerp.metrics_models[1]
 
         # Rebasin
+        if verbose:
+            print("\nRebasin")
         rebasin = PermutationCoordinateDescent(
-            model_a, model_b, input_data=next(iter(self.train_dl)), device_b=device
+            model_a,
+            model_b,
+            input_data=next(iter(self.train_dl)),
+            device_b=device,
+            verbose=verbose
         )
         rebasin.calculate_permutations()
         rebasin.apply_permutations()
         recalculate_batch_norms(model_b, self.train_dl, input_indices=0, device=device)
 
         # Interpolate between models with rebasin
+        if verbose:
+            print("\nInterpolate between model_a and model_b (rebasin weights)")
         lerp = LerpSimple(
             models=(model_a, model_b),
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl
+            train_dataloader=self.train_dl,
+            verbose=verbose
         )
         lerp.interpolate(steps=20)
         results["a_b_rebasin"] = lerp.metrics_interpolated
         loss_b_rebasin = lerp.metrics_models[1]
 
         # Interpolate between original and rebasin models
+        if verbose:
+            print("\nInterpolate between original model_b and rebasin model_b")
         original_model_b = model_type(weights=weights.IMAGENET1K_V1).to(device)
         lerp = LerpSimple(
             models=(original_model_b, model_b),
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl
+            train_dataloader=self.train_dl,
+            verbose=verbose
         )
         lerp.interpolate(steps=20)
         results["b_original_b_rebasin"] = lerp.metrics_interpolated
@@ -238,8 +256,10 @@ class ImageNetEval:
     def run(self, verbose: bool = True) -> None:
         for model_type, weights in self.model_weight_generator():
             if verbose:
-                print(f"Measuring weight matching for {model_type.__name__}")
-            self.measure_weight_matching(model_type, weights)
+                print(
+                    f"\n\nMeasuring weight matching for {model_type.__name__.upper()}"
+                )
+            self.measure_weight_matching(model_type, weights, verbose)
 
 
 if __name__ == "__main__":
