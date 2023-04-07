@@ -147,8 +147,10 @@ class ImageNetEval:
                 self.root_dir,
                 download=False,
                 train=True,
-                transform=weights.IMAGENET1K_V1.transforms()
-            )
+                transform=weights.IMAGENET1K_V1.transforms(),
+            ),
+            shuffle=True,
+            num_workers=30,
         )
         self.val_dl = DataLoader(
             CIFAR10(
@@ -156,7 +158,9 @@ class ImageNetEval:
                 download=False,
                 train=False,
                 transform=weights.IMAGENET1K_V1.transforms()
-            )
+            ),
+            shuffle=False,
+            num_workers=30,
         )
 
         model_a = model_type(weights=weights.IMAGENET1K_V2).to(device)
