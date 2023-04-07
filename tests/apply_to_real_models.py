@@ -184,10 +184,11 @@ class ImageNetEval:
         # Rebasin
         if verbose:
             print("\nRebasin")
+        input_data, _ = next(iter(self.train_dl))
         rebasin = PermutationCoordinateDescent(
             model_a,
             model_b,
-            input_data=next(iter(self.train_dl)),
+            input_data=input_data,
             device_b=device,
             verbose=verbose
         )
