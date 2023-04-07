@@ -1,6 +1,5 @@
 """
 Apply rebasin to real models.
-Get ImageNet data from https://github.com/raminrasoulinezhad/torchvision
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from typing import Any
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision.datasets import ImageNet  # type: ignore[import]
+from torchvision.datasets import CIFAR10  # type: ignore[import]
 from torchvision.models import (  # type: ignore[import]
     EfficientNet_B1_Weights,
     MobileNet_V2_Weights,
@@ -115,8 +114,13 @@ class ImageNetEval:
         for model_name in self.hparams.models:
             assert model_name in model_names, f"{model_name} not in model_names"
 
-        self.train_dl: DataLoader[Any] | None = None
-        self.val_dl: DataLoader[Any] | None = None
+        self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
+        self.train_dl = DataLoader(  # Download the data
+            CIFAR10(root=self.root_dir, train=True, download=True)
+        )
+        self.val_dl = DataLoader(
+            CIFAR10(root=self.root_dir, train=False, download=True)
+        )
 
     def model_weight_generator(self) -> Generator[tuple[Any, Any], None, None]:
         """Generate a model and its weights."""
@@ -138,18 +142,20 @@ class ImageNetEval:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
+        # Make sure that the transforms are correct (from specific weights)
         self.train_dl = DataLoader(
-            ImageNet(
-                root_dir,
-                split="train",
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=True,
                 transform=weights.IMAGENET1K_V1.transforms()
             )
         )
         self.val_dl = DataLoader(
-            ImageNet(
-                root_dir,
-                split="val",
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=False,
                 transform=weights.IMAGENET1K_V1.transforms()
             )
         )
