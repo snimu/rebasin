@@ -139,12 +139,16 @@ class ImageNetEval:
 
         self.train_dl = DataLoader(
             ImageNet(
-                "data", split="train", transform=weights.IMAGENET1K_V1.transforms()
+                "tests/data",
+                split="train",
+                transform=weights.IMAGENET1K_V1.transforms()
             )
         )
         self.val_dl = DataLoader(
             ImageNet(
-                "data", split="val", transform=weights.IMAGENET1K_V1.transforms()
+                "tests/data",
+                split="val",
+                transform=weights.IMAGENET1K_V1.transforms()
             )
         )
 
