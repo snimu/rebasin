@@ -5,6 +5,7 @@ Apply rebasin to real models.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import os
 from pathlib import Path
@@ -161,6 +162,13 @@ class ImageNetEval:
         model_a = model_type(weights=weights.IMAGENET1K_V2).to(device)
         model_b = model_type(weights=weights.IMAGENET1K_V1).to(device)
 
+        # They are trained on ImageNet but evaluated on CIFAR10 here
+        #   -> recalculate the BatchNorms
+        recalculate_batch_norms(model_a, self.train_dl, 0, device, verbose)
+        recalculate_batch_norms(model_b, self.train_dl, 0, device, verbose)
+
+        original_model_b = copy.deepcopy(model_b)
+
         results: dict[str, list[float]] = {
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
         }
@@ -216,7 +224,6 @@ class ImageNetEval:
         # Interpolate between original and rebasin models
         if verbose:
             print("\nInterpolate between original model_b and rebasin model_b")
-        original_model_b = model_type(weights=weights.IMAGENET1K_V1).to(device)
         lerp = LerpSimple(
             models=(original_model_b, model_b),
             devices=[device, device],
