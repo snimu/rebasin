@@ -7,7 +7,6 @@ from __future__ import annotations
 import argparse
 import csv
 import os
-from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -122,12 +121,6 @@ class ImageNetEval:
         self.val_dl = DataLoader(
             CIFAR10(root=self.root_dir, train=False, download=True)
         )
-
-    def model_weight_generator(self) -> Generator[tuple[Any, Any], None, None]:
-        """Generate a model and its weights."""
-        for model, weights in MODELS_AND_WEIGHTS:
-            if model.__name__ in self.hparams.models:
-                yield model, weights
 
     def eval_fn(self, model: nn.Module, device: str | torch.device) -> float:
         losses: list[float] = []
@@ -255,21 +248,17 @@ class ImageNetEval:
             writer.writerows(rows)
 
     def run(self) -> None:
-        for model_type, weights in self.model_weight_generator():
+        for i, (model_type, weights) in enumerate(MODELS_AND_WEIGHTS):
+            if model_type.__name__ not in self.hparams.models:
+                continue
+
             if self.hparams.verbose:
                 print(
-                    f"\n\nMeasuring weight matching for {model_type.__name__.upper()}"
+                    f"\n\n{i}/{len(MODELS_AND_WEIGHTS)}: "
+                    f"Measuring weight matching for {model_type.__name__.upper()}"
                 )
             self.measure_weight_matching(model_type, weights, self.hparams.verbose)
 
 
 if __name__ == "__main__":
-    evaluator = ImageNetEval()
-
-    if evaluator.hparams.verbose:
-        print("Evaluating models:\n\n[")
-        for mname in evaluator.hparams.models:
-            print(f"    {mname},")
-        print("]\n")
-
-    evaluator.run()
+    ImageNetEval().run()
