@@ -36,9 +36,12 @@ class Interpolation:
             device_interp,
             input_indices,
             savedir,
-            save_all
-
+            save_all,
+            verbose
         )
+        if verbose:
+            print("Setting up interpolation...")
+
         if savedir is not None and isinstance(savedir, str):
             savedir = Path(savedir)
 
@@ -57,10 +60,16 @@ class Interpolation:
         self.save_all = save_all
         self.verbose = verbose
 
+        if self.verbose:
+            print("Evaluating given models...")
         self.metrics_models = [
             self.eval_fn(m, d)
-            for m, d in zip(self.models, self.devices)  # noqa: B905
+            for m, d in tqdm(
+                zip(self.models, self.devices), disable=not self.verbose  # noqa: B905
+            )
         ]
+        if self.verbose:
+            print("Done.")
         self.metrics_interpolated: list[float] = []
 
         best_idx = int(self.idx_fn(torch.tensor(self.metrics_models)))
@@ -87,6 +96,7 @@ class Interpolation:
             input_indices: Sequence[int] | int,
             savedir: Path | str | None,
             save_all: bool = False,
+            verbose: bool = False,
     ) -> None:
         assert isinstance(models, Sequence), "Models must be a sequence"
         assert all(isinstance(model, nn.Module) for model in models), \
@@ -123,6 +133,8 @@ class Interpolation:
 
         if save_all:
             assert savedir is not None
+
+        assert isinstance(verbose, bool)
 
 
 class LerpSimple(Interpolation):

@@ -175,6 +175,15 @@ class TestInterpolation(BaseClass):
                 savedir=None
             )
 
+    def test_sanity_checks_verbose(self) -> None:
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                eval_fn=self.eval_fn,
+                eval_mode="min",
+                verbose="not a bool"  # type: ignore[arg-type]
+            )
+
 
 class TestLerpSimple(BaseClass):
     """Test the LerpSimple class."""
