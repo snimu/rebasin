@@ -171,7 +171,10 @@ class ImageNetEval:
 
         # Interpolate between original models
         lerp = LerpSimple(
-            models=(model_a, model_b), devices=[device, device], eval_fn=self.eval_fn
+            models=(model_a, model_b),
+            devices=[device, device],
+            device_interp=device,
+            eval_fn=self.eval_fn
         )
         lerp.interpolate(steps=20)
         results["a_b_original"] = lerp.metrics_interpolated
@@ -190,6 +193,7 @@ class ImageNetEval:
         lerp = LerpSimple(
             models=(model_a, model_b),
             devices=[device, device],
+            device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl
         )
@@ -202,6 +206,7 @@ class ImageNetEval:
         lerp = LerpSimple(
             models=(original_model_b, model_b),
             devices=[device, device],
+            device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl
         )
