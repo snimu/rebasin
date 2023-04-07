@@ -4,7 +4,12 @@ from typing import Any, Union
 
 import torch
 from torch import nn
-from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
+from torchview import (
+    FunctionNode,
+    ModuleNode,
+    TensorNode,
+    draw_graph,
+)
 from tqdm import tqdm
 
 from rebasin import util

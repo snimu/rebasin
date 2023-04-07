@@ -186,7 +186,7 @@ class TestLerpSimple(BaseClass):
         model_a, model_b = self.mlps
 
         # Must be different models
-        for p1, p2 in zip(model_a.parameters(), model_b.parameters(), strict=True):
+        for p1, p2 in zip(model_a.parameters(), model_b.parameters()):  # noqa
             assert not torch.allclose(p1, p2)
 
         # Must produce different outputs
