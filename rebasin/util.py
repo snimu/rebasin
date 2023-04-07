@@ -6,6 +6,7 @@ from typing import Any
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def recalculate_batch_norms(
@@ -13,6 +14,7 @@ def recalculate_batch_norms(
         dataloader: DataLoader[Any],
         input_indices: int | Sequence[int],
         device: torch.device | str | None,
+        verbose: bool,
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
@@ -37,24 +39,29 @@ def recalculate_batch_norms(
             passed to the model.
         device:
             The device on which to run the model.
+        verbose:
+            Whether to print progress.
         *forward_args:
             Any additional positional arguments to pass to the model's forward  pass.
         **forward_kwargs:
             Any additional keyword arguments to pass to the model's forward pass.
     """
-    # Don't waste compute on models without BatchNorm
+    if verbose:
+        print("Recalculating BatchNorm statistics...")
     types = [type(m) for m in model.modules()]
     if (
             nn.BatchNorm1d not in types
             and nn.BatchNorm2d not in types
             and nn.BatchNorm3d not in types
     ):
+        if verbose:
+            print("No BatchNorm layers found in model.")
         return
 
     training = model.training
     model.train()
 
-    for batch in dataloader:
+    for batch in tqdm(dataloader, disable=not verbose):
         if isinstance(batch, Sequence):
             inputs, _ = get_inputs_labels(batch, input_indices, 0, device)
         else:

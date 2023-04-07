@@ -275,7 +275,8 @@ class LerpSimple(Interpolation):
                     model_interp,
                     self.train_dataloader,
                     self.input_indices,
-                    device=self.device_interp
+                    device=self.device_interp,
+                    verbose=self.verbose
                 )
 
             # Evaluate

@@ -194,7 +194,9 @@ class ImageNetEval:
         )
         rebasin.calculate_permutations()
         rebasin.apply_permutations()
-        recalculate_batch_norms(model_b, self.train_dl, input_indices=0, device=device)
+        recalculate_batch_norms(
+            model_b, self.train_dl, input_indices=0, device=device, verbose=verbose
+        )
 
         # Interpolate between models with rebasin
         if verbose:
