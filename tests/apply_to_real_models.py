@@ -39,8 +39,8 @@ from torchvision.models import (  # type: ignore[import]
     Wide_ResNet50_2_Weights,
     Wide_ResNet101_2_Weights,
     efficientnet_b1,
+    mobilenet_v2,
     mobilenet_v3_large,
-    mobilenetv2,
     regnet_x_1_6gf,
     regnet_x_3_2gf,
     regnet_x_8gf,
@@ -68,7 +68,7 @@ from rebasin.util import recalculate_batch_norms
 
 MODELS_AND_WEIGHTS = (  # All the models with V1 and V2 weights
     (efficientnet_b1, EfficientNet_B1_Weights),
-    (mobilenetv2, MobileNet_V2_Weights),
+    (mobilenet_v2, MobileNet_V2_Weights),
     (mobilenet_v3_large, MobileNet_V3_Large_Weights),
     (regnet_x_8gf, RegNet_X_8GF_Weights),
     (regnet_x_16gf, RegNet_X_16GF_Weights),
