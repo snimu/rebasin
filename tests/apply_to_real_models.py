@@ -291,16 +291,17 @@ class ImageNetEval:
         to be recalculated (meaning that the entire training set has to be
         passed through the model for every interpolation step).
         """
-        for i, (model_type, weights) in enumerate(MODELS_AND_WEIGHTS):
-            if model_type.__name__ not in self.hparams.models:
-                continue
+        mandw = [
+            (m, w) for m, w in MODELS_AND_WEIGHTS if m.__name__ in self.hparams.models
+        ]
 
+        for i, (model_type, weights) in enumerate(mandw):
             if self.hparams.verbose:
                 print(
-                    f"\n\n{i+1}/{len(MODELS_AND_WEIGHTS)}: "
+                    f"\n\n{i+1}/{len(mandw)}: "
                     f"Measuring weight matching for {model_type.__name__.upper()}"
                 )
-            self.measure_weight_matching(model_type, weights, self.hparams.verbose )
+            self.measure_weight_matching(model_type, weights, self.hparams.verbose)
 
 
 if __name__ == "__main__":
