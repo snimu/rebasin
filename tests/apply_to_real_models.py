@@ -19,8 +19,7 @@ from torchvision.datasets import CIFAR10  # type: ignore[import]
 from rebasin import PermutationCoordinateDescent
 from rebasin.interpolation import LerpSimple
 from rebasin.util import recalculate_batch_norms
-
-from .fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
+from tests.fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
 
 
 class ImageNetEval:
