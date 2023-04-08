@@ -24,6 +24,8 @@ from torchvision.models import (  # type: ignore[import]
     ResNeXt50_32X4D_Weights,
     ResNeXt101_32X8D_Weights,
     ViT_B_16_Weights,
+    ViT_H_14_Weights,
+    ViT_L_16_Weights,
     Wide_ResNet50_2_Weights,
     Wide_ResNet101_2_Weights,
     efficientnet_b1,
@@ -47,6 +49,8 @@ from torchvision.models import (  # type: ignore[import]
     resnext50_32x4d,
     resnext101_32x8d,
     vit_b_16,
+    vit_h_14,
+    vit_l_16,
     wide_resnet50_2,
     wide_resnet101_2,
 )
@@ -172,7 +176,12 @@ MODELS_AND_WEIGHTS = (
     ModelWeights(
         vit_b_16,
         ViT_B_16_Weights.IMAGENET1K_V1,
-        ViT_B_16_Weights.IMAGENET1K_SWAG_E2E_V1,
+        ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
+    ),
+    ModelWeights(
+        vit_l_16,
+        ViT_L_16_Weights.IMAGENET1K_V1,
+        ViT_L_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
     ),
 )
 
