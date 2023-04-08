@@ -98,6 +98,7 @@ class ImageNetEval:
         parser.add_argument("-m", "--models", type=str, nargs='*')
         parser.add_argument("-a", "--all", action="store_true", default=False)
         parser.add_argument("-v", "--verbose", action="store_true", default=True)
+        parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
 
         self.hparams = parser.parse_args()
 
@@ -116,6 +117,7 @@ class ImageNetEval:
             assert model_name in model_names, f"{model_name} not in model_names"
 
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
+        self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
         self.train_dl = DataLoader(  # Download the data
             CIFAR10(root=self.root_dir, train=True, download=True)
         )
@@ -168,8 +170,9 @@ class ImageNetEval:
 
         # They are trained on ImageNet but evaluated on CIFAR10 here
         #   -> recalculate the BatchNorms
-        recalculate_batch_norms(model_a, self.train_dl, 0, device, verbose)
-        recalculate_batch_norms(model_b, self.train_dl, 0, device, verbose)
+        if not self.hparams.ignore_bn:
+            recalculate_batch_norms(model_a, self.train_dl, 0, device, verbose)
+            recalculate_batch_norms(model_b, self.train_dl, 0, device, verbose)
 
         original_model_b = copy.deepcopy(model_b)
 
@@ -190,9 +193,10 @@ class ImageNetEval:
         )
         rebasin.calculate_permutations()
         rebasin.apply_permutations()
-        recalculate_batch_norms(
-            model_b, self.train_dl, input_indices=0, device=device, verbose=verbose
-        )
+        if not self.hparams.ignore_bn:
+            recalculate_batch_norms(
+                model_b, self.train_dl, input_indices=0, device=device, verbose=verbose
+            )
 
         if verbose:
             print("Interpolate between model_a and model_b (original weights)")
@@ -218,7 +222,7 @@ class ImageNetEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl,
+            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
         lerp.interpolate(steps=20)
@@ -233,7 +237,7 @@ class ImageNetEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl,
+            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
         lerp.interpolate(steps=20)
@@ -256,7 +260,7 @@ class ImageNetEval:
 
         rows.append(("end", loss_b_original, loss_b_rebasin, loss_b_rebasin))
 
-        savefile = os.path.join("results", f"{model_type.__name__}.csv")
+        savefile = os.path.join(self.results_dir, f"{model_type.__name__}.csv")
         with open(savefile, "w") as f:
             writer = csv.writer(f)
             writer.writerows(rows)
@@ -278,7 +282,7 @@ class ImageNetEval:
                     f"\n\n{i+1}/{len(MODELS_AND_WEIGHTS)}: "
                     f"Measuring weight matching for {model_type.__name__.upper()}"
                 )
-            self.measure_weight_matching(model_type, weights, self.hparams.verbose)
+            self.measure_weight_matching(model_type, weights, self.hparams.verbose )
 
 
 if __name__ == "__main__":
