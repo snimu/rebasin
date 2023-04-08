@@ -58,21 +58,27 @@ class ImageNetEval:
 
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
-        self.train_dl = DataLoader(  # Download the data
+
+        self.train_dl_a = DataLoader(  # Download the data
             CIFAR10(root=self.root_dir, train=True, download=True)
         )
-        self.val_dl = DataLoader(
-            CIFAR10(root=self.root_dir, train=False, download=True)
+        self.train_dl_b = DataLoader(
+            CIFAR10(root=self.root_dir, train=True, download=False)
+        )
+        self.val_dl_a = DataLoader(
+            CIFAR10(root=self.root_dir, train=False, download=False)
+        )
+        self.val_dl_b = DataLoader(
+            CIFAR10(root=self.root_dir, train=False, download=False)
         )
 
     def eval_fn(self, model: nn.Module, device: str | torch.device) -> float:
         losses: list[float] = []
         loss_fn = nn.CrossEntropyLoss()
-        assert self.val_dl is not None  # for mypy
+        val_dl = self.val_dl_a if model is self.model_a else self.val_dl_b
+        iters = self.hparams.percent_eval * len(val_dl) / self.hparams.batch_size
 
-        iters = self.hparams.percent_eval * len(self.val_dl) / self.hparams.batch_size
-
-        for i, (inputs, labels) in enumerate(self.val_dl):
+        for i, (inputs, labels) in enumerate(val_dl):
             if i == iters:
                 break
 
@@ -88,41 +94,18 @@ class ImageNetEval:
     ) -> None:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.set_dataloaders(weights_a, weights_b)
 
-        # Make sure that the transforms are correct (from specific weights)
-        self.train_dl = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=True,
-                transform=weights_a.transforms(),
-            ),
-            shuffle=True,
-            num_workers=30,
-            batch_size=self.hparams.batch_size,
-        )
-        self.val_dl = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=False,
-                transform=weights_a.transforms()
-            ),
-            shuffle=False,
-            num_workers=30,
-            batch_size=self.hparams.batch_size,
-        )
-
-        model_a = constructor(weights=weights_a).to(device)
-        model_b = constructor(weights=weights_b).to(device)
+        self.model_a = constructor(weights=weights_a).to(device)
+        self.model_b = constructor(weights=weights_b).to(device)
 
         # They are trained on ImageNet but evaluated on CIFAR10 here
         #   -> recalculate the BatchNorms
         if not self.hparams.ignore_bn:
-            recalculate_batch_norms(model_a, self.train_dl, 0, device, verbose)
-            recalculate_batch_norms(model_b, self.train_dl, 0, device, verbose)
+            recalculate_batch_norms(self.model_a, self.train_dl_a, 0, device, verbose)
+            recalculate_batch_norms(self.model_b, self.train_dl_b, 0, device, verbose)
 
-        original_model_b = copy.deepcopy(model_b)
+        self.original_model_b = copy.deepcopy(self.model_b)
 
         results: dict[str, list[float]] = {
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
@@ -131,10 +114,10 @@ class ImageNetEval:
         # Rebasin
         if verbose:
             print("\nRebasin")
-        input_data, _ = next(iter(self.train_dl))
+        input_data, _ = next(iter(self.train_dl_b))
         rebasin = PermutationCoordinateDescent(
-            model_a,
-            model_b,
+            self.model_a,
+            self.model_b,
             input_data=input_data,
             device_b=device,
             verbose=verbose
@@ -143,7 +126,11 @@ class ImageNetEval:
         rebasin.apply_permutations()
         if not self.hparams.ignore_bn:
             recalculate_batch_norms(
-                model_b, self.train_dl, input_indices=0, device=device, verbose=verbose
+                self.model_b,
+                self.train_dl_b,
+                input_indices=0,
+                device=device,
+                verbose=verbose
             )
 
         if verbose:
@@ -151,7 +138,7 @@ class ImageNetEval:
 
         # Interpolate between original models
         lerp = LerpSimple(
-            models=(model_a, original_model_b),
+            models=(self.model_a, self.original_model_b),
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
@@ -166,11 +153,11 @@ class ImageNetEval:
         if verbose:
             print("\nInterpolate between model_a and model_b (rebasin weights)")
         lerp = LerpSimple(
-            models=(model_a, model_b),
+            models=(self.model_a, self.model_b),
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
+            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
         lerp.interpolate(steps=20)
@@ -181,11 +168,11 @@ class ImageNetEval:
         if verbose:
             print("\nInterpolate between original model_b and rebasin model_b")
         lerp = LerpSimple(
-            models=(original_model_b, model_b),
+            models=(self.original_model_b, self.model_b),
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
+            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
         lerp.interpolate(steps=20)
@@ -212,6 +199,52 @@ class ImageNetEval:
         with open(savefile, "w") as f:
             writer = csv.writer(f)
             writer.writerows(rows)
+
+    def set_dataloaders(self, weights_a: Any, weights_b: Any) -> None:
+        self.train_dl_a = DataLoader(
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=True,
+                transform=weights_a.transforms(),
+            ),
+            shuffle=True,
+            num_workers=30,
+            batch_size=self.hparams.batch_size,
+        )
+        self.train_dl_b = DataLoader(
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=True,
+                transform=weights_b.transforms(),
+            ),
+            shuffle=True,
+            num_workers=30,
+            batch_size=self.hparams.batch_size,
+        )
+        self.val_dl_a = DataLoader(
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=False,
+                transform=weights_a.transforms()
+            ),
+            shuffle=False,
+            num_workers=30,
+            batch_size=self.hparams.batch_size,
+        )
+        self.val_dl_b = DataLoader(
+            CIFAR10(
+                self.root_dir,
+                download=False,
+                train=False,
+                transform=weights_b.transforms()
+            ),
+            shuffle=False,
+            num_workers=30,
+            batch_size=self.hparams.batch_size,
+        )
 
     def run(self) -> None:
         """Run the evaluation.
