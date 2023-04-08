@@ -99,6 +99,12 @@ class ImageNetEval:
         parser.add_argument("-a", "--all", action="store_true", default=False)
         parser.add_argument("-v", "--verbose", action="store_true", default=True)
         parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
+        parser.add_argument("-b", "--batch_size", type=int, default=64)
+        parser.add_argument(
+            "-p", "--percent_eval",
+            type=float, default=100,
+            help="Percent of data to evaluate on. Between 0 and 100."
+        )
 
         self.hparams = parser.parse_args()
 
@@ -116,6 +122,10 @@ class ImageNetEval:
         for model_name in self.hparams.models:
             assert model_name in model_names, f"{model_name} not in model_names"
 
+        assert self.hparams.batch_size > 0, "Batch size must be greater than 0"
+        assert 0 < self.hparams.percent_eval <= 100, "Percent eval must be in ]0, 100]"
+        self.hparams.percent_eval = self.hparams.percent_eval / 100
+
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
         self.train_dl = DataLoader(  # Download the data
@@ -129,7 +139,13 @@ class ImageNetEval:
         losses: list[float] = []
         loss_fn = nn.CrossEntropyLoss()
         assert self.val_dl is not None  # for mypy
-        for inputs, labels in self.val_dl:
+
+        iters = self.hparams.percent_eval * len(self.val_dl) / self.hparams.batch_size
+
+        for i, (inputs, labels) in enumerate(self.val_dl):
+            if i == iters:
+                break
+
             inputs = inputs.to(device)
             labels = labels.to(device)
             outputs = model(inputs)
@@ -153,6 +169,7 @@ class ImageNetEval:
             ),
             shuffle=True,
             num_workers=30,
+            batch_size=self.hparams.batch_size,
         )
         self.val_dl = DataLoader(
             CIFAR10(
@@ -163,6 +180,7 @@ class ImageNetEval:
             ),
             shuffle=False,
             num_workers=30,
+            batch_size=self.hparams.batch_size,
         )
 
         model_a = model_type(weights=weights.IMAGENET1K_V2).to(device)
