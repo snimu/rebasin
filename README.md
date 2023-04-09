@@ -13,6 +13,7 @@ Can be applied to arbitrary models, without modification.
   - [vit_b_16](#vitb16)
   - [efficientnet_b1](#efficientnetb1)
 - [Plans](#plans)
+- [Acknowledgements](#acknowledgements)
 
 ## Installation
 ```bash
@@ -71,6 +72,8 @@ lerp.best_model
 Below, I present some preliminary results. In them, I used `torchvision`-models with two different 
 pre-trained weights. I interpolated between the two sets of weights, 
 "rebasined" one, and interpolated again, saving all the losses.
+
+### **VERY IMPORTANT CAVEATS**
 
 **Caveat 1**: I tested on CIFAR10, even though the models are trained on ImageNet.
 This is because I don't currently have access to the ImageNet dataset as used 
@@ -171,3 +174,23 @@ Here, I present my near-term plans for this package. They may change.
     3. Spline interpolation
       
     This is especially relevant for interpolating between more than two models at a time.
+
+
+## Acknowledgements
+
+**The paper:**
+
+```
+Ainsworth, Samuel K., Jonathan Hayase, and Siddhartha Srinivasa. 
+"Git re-basin: Merging models modulo permutation symmetries." 
+arXiv preprint arXiv:2209.04836 (2022).
+```
+
+Link: https://arxiv.org/abs/2209.04836 (accessed on April 9th, 2023)
+
+
+**Other**
+
+My code took inspiration from the following sources:
+
+- https://github.com/themrzmaster/git-re-basin-pytorch
