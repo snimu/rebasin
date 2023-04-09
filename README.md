@@ -29,16 +29,19 @@ from rebasin import PermutationCoordinateDescent
 from rebasin import interpolation
 
 model_a, model_b, train_dl, val_dl, loss_fn = ...
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def eval_fn(model: nn.Module, device: str | torch.device | None = None) -> float:
+
+def eval_fn(model: nn.Module, model_device: str | torch.device | None = None) -> float:
     loss = 0.0
     for inputs, logits in val_dl:
-        if device is not None:
-            inputs = inputs.to(device)
-            logits = logits.to(device)
+        if model_device is not None:
+            inputs = inputs.to(model_device)
+            logits = logits.to(model_device)
         outputs = model(inputs)
         loss = loss_fn(outputs, logits)
     return loss / len(val_dl)
+
 
 input_data = next(iter(train_dl))[0]
 
@@ -49,7 +52,8 @@ pcd.apply_permutations()
 
 # Interpolate
 lerp = interpolation.LerpSimple(
-    models=[model_a, model_b], 
+    models=[model_a, model_b],
+    devices=[device, device],
     eval_fn=eval_fn,  # Can be any metric as long as the function takes a model and a device
     eval_mode="min",  # "min" or "max"
     train_dataloader=train_dl,  # Used to recalculate BatchNorm statistics; optional
@@ -80,8 +84,8 @@ because I cannot afford to rent an A100 for a week.
 **Those models are marked with a \*.**
 
 **Caveat 3**: I did not include the results for all models below,
-so if you want to see more, look at the files in `tests/results/`
-and `tests/results/images`.
+so if you want to see more, look at the files in [tests/results/](tests/results/)
+and [tests/results/images](tests/results/images).
 
 
 ### General takeaways
@@ -119,3 +123,25 @@ Ainsworth et al. mention that their method works better if the filters are large
 and the ViT models have very large filters.
 
 Again, testing on ImageNet is crucial here! I will attempt to do so in the future.
+
+
+## Plans
+
+Here, I present my near-term plans for this package. They may change.
+
+- [x] Implement weight-matching
+- [x] Implement linear interpolation
+- [ ] Test on ImageNet
+- [ ] Test on other datasets with other models &mdash; for example, I would like to test
+      `rebasin` on [hlb-gpt](https://github.com/tysam-code/hlb-gpt)
+- [ ] Create proper documentation and write docstrings
+- [ ] Implement other rebasing methods:
+    1. Straight-through estimator. This allegedly has better results than weight-matching,
+       though at higher computational cost.
+    2. Activation-matching. Just for completeness.
+- [ ] Implement other interpolation methods:
+    1. Quadratic interpolation
+    2. Cubic interpolation
+    3. Spline interpolation
+      
+    This is especially relevant for interpolating between more than two models at a time.
