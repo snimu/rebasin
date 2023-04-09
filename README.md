@@ -11,6 +11,7 @@ Can be applied to arbitrary models, without modification.
 - [Results: Weight-matching (PermutationCoordinateDescent)](#results-weight-matching-permutationcoordinatedescent)
   - [General takeaways](#general-takeaways)
   - [vit_b_16](#vitb16)
+- [Plans](#plans)
 
 ## Installation
 ```bash
@@ -71,7 +72,10 @@ pre-trained weights. I interpolated between the two sets of weights,
 "rebasined" one, and interpolated again, saving all the losses.
 
 **Caveat 1**: I tested on CIFAR10, even though the models are trained on ImageNet.
-This is because I don't currently have access to the ImageNet dataset.
+This is because I don't currently have access to the ImageNet dataset as used 
+for training the torchvision models
+(the dataset should be [here](https://image-net.org/challenges/LSVRC/2012/), 
+but seems unavailable. Please correct me if I'm wrong).
 I will try to gain that access and repeat the experiments.
 For now, these results have to suffice; I think that they are still interesting.
 
@@ -98,6 +102,8 @@ and [tests/results/images](tests/results/images).
    - The models interpolated between model_a and model_b_rebasin are usually the best.
    - This means that rebasing + interpolating can be a decent preparation for transfer learning, 
      especially as it is very fast.
+   - There are no (significant) loss barriers between the original two models, 
+     making this test less useful for testing the weight-matching method.
   
 
 ### vit_b_16
@@ -125,12 +131,31 @@ and the ViT models have very large filters.
 Again, testing on ImageNet is crucial here! I will attempt to do so in the future.
 
 
+### efficientnet_b1*
+
+From both the losses of the original models and the rebasined model,
+as well as the losses of the interpolated models, we can see that
+[all takeaways](#general-takeaways) are true, except that the 
+rebasined model lies very close to the optimum for CIFAR10 
+(along the line of interpolation, which still leaves room for improvement):
+
+<p align="center">
+  <img src="tests/results/images/efficientnet_b1_bar.png" alt="efficientnet_b1_bar" width="500"/>
+</p>
+
+
+<p align="center">
+  <img src="tests/results/images/efficientnet_b1_line.png" alt="efficientnet_b1_line" width="500"/>
+</p>
+
+
 ## Plans
 
 Here, I present my near-term plans for this package. They may change.
 
 - [x] Implement weight-matching
 - [x] Implement linear interpolation
+- [ ] Increase unittest-coverage and test on push / merge (GitHub Actions)
 - [ ] Test on ImageNet
 - [ ] Test on other datasets with other models &mdash; for example, I would like to test
       `rebasin` on [hlb-gpt](https://github.com/tysam-code/hlb-gpt)
