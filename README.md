@@ -11,6 +11,7 @@ Can be applied to arbitrary models, without modification.
 - [Results: Weight-matching (PermutationCoordinateDescent)](#results-weight-matching-permutationcoordinatedescent)
   - [General takeaways](#general-takeaways)
   - [vit_b_16](#vitb16)
+  - [efficientnet_b1](#efficientnetb1)
 - [Plans](#plans)
 
 ## Installation
