@@ -22,7 +22,7 @@ from rebasin.util import recalculate_batch_norms
 from tests.fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
 
 
-class ImageNetEval:
+class TorchvisionEval:
     def __init__(self) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("-m", "--models", type=str, nargs='*')
@@ -274,4 +274,4 @@ class ImageNetEval:
 
 
 if __name__ == "__main__":
-    ImageNetEval().run()
+    TorchvisionEval().run()
