@@ -11,7 +11,7 @@ select = [
     "NPY", # NumPy-specific rules
     "RUF", # Ruff-specific rules
 ]
-ignore = []
+ignore = ["UP038"]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 fixable = [

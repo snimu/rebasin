@@ -97,9 +97,9 @@ class PermutationInitializer:
             if not ("weight" in name_a or "bias" in name_a):
                 continue
 
-            if not isinstance(param_a, torch.Tensor | nn.Parameter):
+            if not isinstance(param_a, (torch.Tensor, nn.Parameter)):
                 continue
-            if not isinstance(param_b, torch.Tensor | nn.Parameter):
+            if not isinstance(param_b, (torch.Tensor, nn.Parameter)):
                 continue
 
             assert isinstance(param_a.shape, torch.Size)
