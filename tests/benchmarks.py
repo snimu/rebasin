@@ -209,7 +209,7 @@ class BenchmarkPermutationCoordinateDescent:
             savefile,
         )
 
-    @classmethod 
+    @classmethod
     def test_mlp_3b(cls, savefile: str | None = None) -> None:
         model_a = mlp_3b().to("cpu")
         model_b = mlp_3b().to("cuda")
