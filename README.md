@@ -1,4 +1,10 @@
 # rebasin
+
+![PyPI Version](https://img.shields.io/pypi/v/rebasin)
+![Wheel](https://img.shields.io/pypi/wheel/rebasin)
+[![Python 3.7+](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/downloads/release/python-370/)
+![License](https://img.shields.io/github/license/snimu/rebasin)
+
 An implementation of methods described in 
 ["Git Re-basin"-paper by Ainsworth et al.](https://arxiv.org/abs/2209.04836)
 
@@ -9,9 +15,12 @@ Can be applied to **arbitrary models**, without modification.
 - [Installation](#installation)
 - [Usage](#usage)
 - [Results: Weight-matching (PermutationCoordinateDescent)](#results-weight-matching-permutationcoordinatedescent)
-  - [General takeaways](#general-takeaways)
-  - [vit_b_16](#vitb16)
-  - [efficientnet_b1](#efficientnetb1)
+  - [HLB-GPT](#hlb-gpt)
+  - [torchvision.models](#torchvisionmodels)
+    - [Caveats](#caveats)
+    - [General takeaways](#general-takeaways)
+    - [vit_b_16](#vitb16)
+    - [efficientnet_b1](#efficientnetb1)
 - [Plans](#plans)
 - [Acknowledgements](#acknowledgements)
 
@@ -73,7 +82,59 @@ Below, I present some preliminary results. In them, I used `torchvision`-models 
 pre-trained weights. I interpolated between the two sets of weights, 
 "rebasined" one, and interpolated again, saving all the losses.
 
-### **VERY IMPORTANT CAVEATS**
+---
+
+### HLB-GPT
+
+I forked [tysam-code/hlb-gpt](https://github.com/tysam-code/hlb-gpt) 
+(see [here](https://github.com/snimu/hlb-gpt)) and trained two models on the same dataset
+(`model_a` and `model_b_original`).
+I rebasined `model_b_original` towards `model_a` to get `model_b_rebasin`, 
+and interpolated between the resulting models in the following combinations:
+
+- `model_a` and `model_b_original`
+- `model_a` and `model_b_rebasin`
+- `model_b_original` and `model_b_rebasin`
+
+The results are shown below:
+
+<p align="center">
+  <img src="tests/results/hlb-gpt/images/hlb_line.png" alt="hlb-gpt" width="500"/>
+</p>
+
+Two things become obvious:
+
+1. The rebasined model (`model_b_rebasin`) is way worse 
+    than the original model (`model_b_original`)
+2. Interpolation between any of the three models is anything but smooth.
+    However, the interpolated models aren't significantly worse than the original ones;
+    in many cases, they have similar performance
+
+Point 2 makes me wonder which is better: training a model for a long time,
+or training two models for a short time, rebasining one towards the other,
+and retraining it for a short time.
+
+However, in total, this experiment was a failure.
+
+It will be interesting to see whether bigger models will show better results.
+According to Ainsworth et al., the method should work better if the filters are bigger.
+The `SpeedyLangNet` used here has ~30M parameters; the `vit_b_16` used in the next section
+has ~86M parameters.
+
+---
+
+---
+
+### torchvision.models
+
+Below, I discuss results for models from `torchvision.models` 
+that have two distinct sets of weights.
+
+I rebasin the worse weights towards the better ones, then interpolate.
+
+---
+
+#### Caveats
 
 **Caveat 1**: I tested on CIFAR10, even though the models are trained on ImageNet.
 This is because I don't currently have access to the ImageNet dataset as used 
@@ -95,8 +156,9 @@ because I cannot afford to rent an A100 for a week.
 so if you want to see more, look at the files in [tests/results/](tests/results/)
 and [tests/results/images](tests/results/images).
 
+---
 
-### General takeaways
+#### General takeaways
 
 1. The weights that are better on ImageNet are also better on CIFAR10.
 2. The rebasined model performs better than the original model.
@@ -109,14 +171,15 @@ and [tests/results/images](tests/results/images).
    - There are no (significant) loss barriers between the original two models, 
      making this test less useful for testing the weight-matching method.
   
+---
 
-### vit_b_16
+#### vit_b_16
 
 Comparing the losses of the original models and the rebasined model, 
 we can see that [takeaways 1 and 2](#general-takeaways) are true:
 
 <p align="center">
-  <img src="tests/results/images/vit_b_16_bar.png" alt="vit_b_16_bar" width="500"/>
+  <img src="tests/results/torchvision/cifar10/images/vit_b_16_bar.png" alt="vit_b_16_bar" width="500"/>
 </p>
 
 
@@ -124,7 +187,7 @@ When the losses of all models, including the interpolated ones, are drawn as bel
 we can see that the plots support [all three takeaways](#general-takeaways):
 
 <p align="center">
-  <img src="tests/results/images/vit_b_16_line.png" alt="vit_b_16_line" width="500"/>
+  <img src="tests/results/torchvision/cifar10/images/vit_b_16_line.png" alt="vit_b_16_line" width="500"/>
 </p>
 
 
@@ -134,8 +197,9 @@ and the ViT models have very large filters.
 
 Again, testing on ImageNet is crucial here! I will attempt to do so in the future.
 
+---
 
-### efficientnet_b1*
+#### efficientnet_b1*
 
 From both the losses of the original models and the rebasined model,
 as well as the losses of the interpolated models, we can see that
@@ -144,14 +208,15 @@ rebasined model lies very close to the optimum for CIFAR10
 (along the line of interpolation, which still leaves room for improvement):
 
 <p align="center">
-  <img src="tests/results/images/efficientnet_b1_bar.png" alt="efficientnet_b1_bar" width="500"/>
+  <img src="tests/results/torchvision/cifar10/images/efficientnet_b1_bar.png" alt="efficientnet_b1_bar" width="500"/>
 </p>
 
 
 <p align="center">
-  <img src="tests/results/images/efficientnet_b1_line.png" alt="efficientnet_b1_line" width="500"/>
+  <img src="tests/results/torchvision/cifar10/images/efficientnet_b1_line.png" alt="efficientnet_b1_line" width="500"/>
 </p>
 
+---
 
 ## Plans
 
