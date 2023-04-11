@@ -107,27 +107,27 @@ class Interpolation:
         assert isinstance(eval_mode, str)
         assert eval_mode in ["min", "max"], "Eval mode must be 'min' or 'max'"
 
-        assert isinstance(train_dataloader, (DataLoader, type(None)))
+        assert isinstance(train_dataloader, DataLoader | type(None))
 
         if devices is None:
             assert device_interp is None
         else:
             assert isinstance(devices, Sequence)
             assert all(
-                isinstance(device, (str, torch.device)) for device in devices
+                isinstance(device, str | torch.device) for device in devices
             )
             assert len(devices) == len(models)
 
         if device_interp is None:  # goes both ways
             assert devices is None
         else:
-            assert isinstance(device_interp, (str, torch.device))
+            assert isinstance(device_interp, str | torch.device)
 
-        assert isinstance(input_indices, (int, Sequence))
+        assert isinstance(input_indices, int | Sequence)
         if isinstance(input_indices, Sequence):
             assert all(isinstance(i, int) for i in input_indices)
 
-        assert isinstance(savedir, (Path, str, type(None)))
+        assert isinstance(savedir, Path | str | type(None))
         assert isinstance(save_all, bool)
 
         assert len(models) > 1, "Need at least two models to interpolate between"
@@ -210,7 +210,7 @@ class LerpSimple(Interpolation):
                 if not None.
         """
         # SANITY CHECKS AND DEFAULT SETTINGS
-        assert isinstance(savedir, (Path, str, type(None)))
+        assert isinstance(savedir, Path | str | type(None))
         if savedir is None:
             savedir = self.savedir
         elif isinstance(savedir, str):
