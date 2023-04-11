@@ -8,6 +8,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from rebasin.structs import ModelInfo
+
 
 def recalculate_batch_norms(
         model: nn.Module,
@@ -152,3 +154,61 @@ def contains_parameter(
         Whether the sequence contains the parameter.
     """
     return any(param is parameter for param in parameters)
+
+
+def model_info(model: nn.Module) -> ModelInfo:
+    """
+    Get information about a model.
+
+    Args:
+        model:
+            The model.
+
+    Returns:
+        The :class:`ModelInfo` object containing the desired information.
+    """
+    name = model.__class__.__name__
+    num_parameters = sum(p.numel() for p in model.parameters())
+    num_weights = sum(1 if "weight" in n else 0 for n, _ in model.named_parameters())
+    num_biases = sum(1 if "bias" in n else 0 for n, _ in model.named_parameters())
+    num_elements_per_weight = [
+        p.numel() for n, p in model.named_parameters() if "weight" in n
+    ]
+    num_elements_per_bias = [
+        p.numel() for n, p in model.named_parameters() if "bias" in n
+    ]
+
+    num_permutable_elements_per_weight = []
+    for name, parameter in model.named_parameters():
+        if "weight" in name:
+            shape = parameter.shape
+            permutable = shape[0] if len(shape) == 1 else shape[0] * shape[1]
+            num_permutable_elements_per_weight.append(permutable)
+
+    num_elements_per_weight_mean = torch.mean(
+        torch.tensor(num_elements_per_weight, dtype=torch.float)
+    ).item()
+    num_elements_per_weight_std = torch.std(
+        torch.tensor(num_elements_per_weight, dtype=torch.float)
+    ).item()
+    num_elements_per_bias_mean = torch.mean(
+        torch.tensor(num_elements_per_bias, dtype=torch.float)
+    ).item()
+    num_elements_per_bias_std = torch.std(
+        torch.tensor(num_elements_per_bias, dtype=torch.float)
+    ).item()
+
+    return ModelInfo(
+        name=name,
+        num_parameters=num_parameters,
+        num_weights=num_weights,
+        num_biases=num_biases,
+        num_elements_per_weight=num_elements_per_weight,
+        num_permutable_elements_per_weight=num_permutable_elements_per_weight,
+        num_elements_per_bias=num_elements_per_bias,
+        num_elements_per_weight_mean=num_elements_per_weight_mean,
+        num_elements_per_weight_std=num_elements_per_weight_std,
+        num_elements_per_bias_mean=num_elements_per_bias_mean,
+        num_elements_per_bias_std=num_elements_per_bias_std,
+    )
+
