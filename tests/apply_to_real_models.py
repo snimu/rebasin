@@ -244,25 +244,25 @@ class TorchvisionEval:
             self, weights_a: Any, weights_b: Any
     ) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
         train_ds_a = CIFAR10(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             train=True,
             download=False,
             transform=weights_a.transforms()
         )
         train_ds_b = CIFAR10(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             train=True,
             download=False,
             transform=weights_b.transforms()
         )
         val_ds_a = CIFAR10(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             train=False,
             download=False,
             transform=weights_a.transforms()
         )
         val_ds_b = CIFAR10(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             train=False,
             download=False,
             transform=weights_b.transforms()
@@ -273,22 +273,22 @@ class TorchvisionEval:
             self, weights_a: Any, weights_b: Any
     ) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
         train_ds_a = ImageNet(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             split="train",
             transform=weights_a.transforms()
         )
         train_ds_b = ImageNet(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             split="train",
             transform=weights_b.transforms()
         )
         val_ds_a = ImageNet(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             split="val",
             transform=weights_a.transforms()
         )
         val_ds_b = ImageNet(
-            root=self.hparams.data_dir,
+            root=self.root_dir,
             split="val",
             transform=weights_b.transforms()
         )
