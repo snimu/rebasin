@@ -14,7 +14,7 @@ from typing import Any
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10  # type: ignore[import]
+from torchvision.datasets import CIFAR10, ImageNet  # type: ignore[import]
 
 from rebasin import PermutationCoordinateDescent
 from rebasin.interpolation import LerpSimple
@@ -30,6 +30,7 @@ class TorchvisionEval:
         parser.add_argument("-v", "--verbose", action="store_true", default=True)
         parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
         parser.add_argument("-b", "--batch_size", type=int, default=64)
+        parser.add_argument("-d", "--dataset", type=str, default="cifar10")
         parser.add_argument(
             "-p", "--percent_eval",
             type=float, default=100,
@@ -37,6 +38,9 @@ class TorchvisionEval:
         )
 
         self.hparams = parser.parse_args()
+
+        assert self.hparams.dataset in ("cifar10", "imagenet"), \
+            "Dataset must be cifar10 or imagenet"
 
         if self.hparams.models is not None and not self.hparams.all:
             assert self.hparams.models, "Must specify models or all"
@@ -200,50 +204,95 @@ class TorchvisionEval:
             writer.writerows(rows)
 
     def set_dataloaders(self, weights_a: Any, weights_b: Any) -> None:
+        if self.hparams.dataset == "cifar10":
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_dataloaders(
+                weights_a, weights_b
+            )
+        elif self.hparams.dataset == "imagenet":
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_dataloaders(
+                weights_a, weights_b
+            )
+        else:
+            raise ValueError(f"Unknown dataset {self.hparams.dataset}")
+
         self.train_dl_a = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=True,
-                transform=weights_a.transforms(),
-            ),
+            train_ds_a,
             shuffle=True,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
         self.train_dl_b = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=True,
-                transform=weights_b.transforms(),
-            ),
+            train_ds_b,
             shuffle=True,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
         self.val_dl_a = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=False,
-                transform=weights_a.transforms()
-            ),
+            val_ds_a,
             shuffle=False,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
         self.val_dl_b = DataLoader(
-            CIFAR10(
-                self.root_dir,
-                download=False,
-                train=False,
-                transform=weights_b.transforms()
-            ),
+            val_ds_b,
             shuffle=False,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
+
+    def get_cifar10_dataloaders(
+            self, weights_a: Any, weights_b: Any
+    ) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
+        train_ds_a = CIFAR10(
+            root=self.hparams.data_dir,
+            train=True,
+            download=False,
+            transform=weights_a.transforms()
+        )
+        train_ds_b = CIFAR10(
+            root=self.hparams.data_dir,
+            train=True,
+            download=False,
+            transform=weights_b.transforms()
+        )
+        val_ds_a = CIFAR10(
+            root=self.hparams.data_dir,
+            train=False,
+            download=False,
+            transform=weights_a.transforms()
+        )
+        val_ds_b = CIFAR10(
+            root=self.hparams.data_dir,
+            train=False,
+            download=False,
+            transform=weights_b.transforms()
+        )
+        return train_ds_a, train_ds_b, val_ds_a, val_ds_b
+
+    def get_imagenet_dataloaders(
+            self, weights_a: Any, weights_b: Any
+    ) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
+        train_ds_a = ImageNet(
+            root=self.hparams.data_dir,
+            split="train",
+            transform=weights_a.transforms()
+        )
+        train_ds_b = ImageNet(
+            root=self.hparams.data_dir,
+            split="train",
+            transform=weights_b.transforms()
+        )
+        val_ds_a = ImageNet(
+            root=self.hparams.data_dir,
+            split="val",
+            transform=weights_a.transforms()
+        )
+        val_ds_b = ImageNet(
+            root=self.hparams.data_dir,
+            split="val",
+            transform=weights_b.transforms()
+        )
+        return train_ds_a, train_ds_b, val_ds_a, val_ds_b
 
     def run(self) -> None:
         """Run the evaluation.
