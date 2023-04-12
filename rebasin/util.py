@@ -76,7 +76,6 @@ def recalculate_batch_norms(
 
         model.running_mean = torch.zeros_like(module.running_mean)
         model.running_var = torch.zeros_like(module.running_var)
-
     # Recalculate the running mean and variance
     for batch in tqdm(dataloader, disable=not verbose):
         if isinstance(batch, Sequence):
@@ -179,8 +178,8 @@ def model_info(model: nn.Module) -> ModelInfo:
     ]
 
     num_permutable_elements_per_weight = []
-    for name, parameter in model.named_parameters():
-        if "weight" in name:
+    for pname, parameter in model.named_parameters():
+        if "weight" in pname:
             shape = parameter.shape
             permutable = shape[0] if len(shape) == 1 else shape[0] * shape[1]
             num_permutable_elements_per_weight.append(permutable)
