@@ -16,7 +16,7 @@ def full_filename(file: str, lib: str, dataset: str = "") -> str:
     filename = os.path.join(filename, "results")
     filename = os.path.join(filename, lib) if lib else filename
     filename = os.path.join(filename, dataset) if dataset else filename
-    filename = os.path.join(filename, file)
+    filename = os.path.join(filename, file) if file else filename
     return filename
 
 
@@ -27,8 +27,8 @@ def to_named_img(file: str, name: str, lib: str, dataset: str = "") -> str:
     return f"{filename[:-4]}_{name}.png"
 
 
-def file_generator(lib: str) -> Generator[str, None, None]:
-    for file in os.listdir(full_filename("", lib)):  # list files in results
+def file_generator(lib: str, dataset: str = "") -> Generator[str, None, None]:
+    for file in os.listdir(full_filename("", lib, dataset)):  # list files in results
         if file.endswith(".csv"):
             yield file
 
@@ -72,7 +72,7 @@ def get_info(file: str, dataset: str) -> tuple[SweepInfo, SweepInfo, SweepInfo]:
     )
 
 
-def bar_plot(file: str, dataset: str) -> None:
+def bar_plot(file: str, dataset: str = "cifar10") -> None:
     sweep_ab_orig, sweep_ab_rebasin, sweep_b_orig_b_rebasin = get_info(file, dataset)
 
     loss_a = sweep_ab_orig.losses[0]
@@ -118,7 +118,9 @@ def bar_plot(file: str, dataset: str) -> None:
     # Save the plot
     filename = to_named_img(file, "bar", "torchvision", dataset)
     fig.savefig(filename, dpi=300)
-    # plt.show()
+
+    # Close the plot
+    plt.close(fig)
 
 
 def line_plot(file: str, dataset: str = "cifar10") -> None:
@@ -137,7 +139,7 @@ def line_plot(file: str, dataset: str = "cifar10") -> None:
 
     # Set tiles
     fig.suptitle(
-        f"Interpolation between models of type {sweep_ab_orig.model}",
+        f"Interpolation: {sweep_ab_orig.model}",
         fontsize=14,
         fontweight='bold'
     )
@@ -229,6 +231,9 @@ def line_plot(file: str, dataset: str = "cifar10") -> None:
     filename = to_named_img(file, "line", "torchvision", dataset)
     fig.savefig(filename, dpi=300)
 
+    # Close the plot
+    plt.close(fig)
+
 
 def read_csv(file: str) -> dict[str, list[Any]]:
     assert file.endswith(".csv")
@@ -275,7 +280,9 @@ def draw_hlb_gpt() -> None:
     # Save the plot
     filename = to_named_img("hlb-gpt", "line", "hlb-gpt")
     fig.savefig(filename, dpi=300)
-    # plt.show()
+
+    # Close the plot
+    plt.close(fig)
 
 
 def draw_ax(
@@ -351,4 +358,7 @@ def draw_ax(
 
 
 if __name__ == "__main__":
-    draw_hlb_gpt()
+    for file in file_generator("torchvision", "cifar10"):
+        print(file)
+        line_plot(file)
+        bar_plot(file)
