@@ -231,7 +231,11 @@ the full evaluation dataset was used.
 The results are very similar to those of the other models.
 
 <p align="center">
-  <img src="tests/results/torchvision/cifar10/images/wide_resnet50_2_bar.png" alt="wide_resnet50_2_bar" width="500"/>
+  <img 
+    src="tests/results/torchvision/cifar10/images/wide_resnet50_2_bar.png" 
+    alt="wide_resnet50_2_bar" 
+    width="500"
+  />
 </p>
 
 Interestingly, the best model is found by interpolating between the original models,
