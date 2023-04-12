@@ -162,7 +162,9 @@ and [tests/results/torchvision/cifar10/images](tests/results/torchvision/cifar10
 #### General takeaways
 
 1. The weights that are better on ImageNet are also better on CIFAR10.
-2. The rebasined model performs better than the original model.
+2. The rebasined model performs better than the original model. It would be interesting to see
+   whether this is true if the better weights are rebasined towards the worse weights, 
+   instead of the other way around.
 3. The loss basins of the different models trained on ImageNet seem to 
    roughly surround a single loss basin for CIFAR10.
    - This means that the interpolated models tend to perform better than the original models.
@@ -225,10 +227,10 @@ Here, I present my near-term plans for this package. They may change.
 
 - [x] Implement weight-matching
 - [x] Implement linear interpolation
+- [x] Test on other datasets with other models &mdash; for example, I would like to test
+      `rebasin` on [hlb-gpt](https://github.com/tysam-code/hlb-gpt)
 - [ ] Increase unittest-coverage and test on push / merge (GitHub Actions)
 - [ ] Test on ImageNet
-- [ ] Test on other datasets with other models &mdash; for example, I would like to test
-      `rebasin` on [hlb-gpt](https://github.com/tysam-code/hlb-gpt)
 - [ ] Create proper documentation and write docstrings
 - [ ] Implement other rebasing methods:
     1. Straight-through estimator. This allegedly has better results than weight-matching,
