@@ -31,6 +31,7 @@ class TorchvisionEval:
         parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
         parser.add_argument("-b", "--batch_size", type=int, default=64)
         parser.add_argument("-d", "--dataset", type=str, default="cifar10")
+        parser.add_argument("-s", "--steps", type=int, default=20)
         parser.add_argument(
             "-p", "--percent_eval",
             type=float, default=100,
@@ -41,6 +42,8 @@ class TorchvisionEval:
 
         assert self.hparams.dataset in ("cifar10", "imagenet"), \
             "Dataset must be cifar10 or imagenet"
+
+        assert self.hparams.steps > 0, "Interpolate for at least one step!"
 
         if self.hparams.models is not None and not self.hparams.all:
             assert self.hparams.models, "Must specify models or all"
@@ -151,7 +154,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
-        lerp.interpolate(steps=20)
+        lerp.interpolate(steps=self.hparams.steps)
         results["a_b_original"] = lerp.metrics_interpolated
         loss_a = lerp.metrics_models[0]
         loss_b_original = lerp.metrics_models[1]
@@ -167,7 +170,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
-        lerp.interpolate(steps=20)
+        lerp.interpolate(steps=self.hparams.steps)
         results["a_b_rebasin"] = lerp.metrics_interpolated
         loss_b_rebasin = lerp.metrics_models[1]
 
@@ -182,7 +185,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
-        lerp.interpolate(steps=20)
+        lerp.interpolate(steps=self.hparams.steps)
         results["b_original_b_rebasin"] = lerp.metrics_interpolated
 
         # Save results
