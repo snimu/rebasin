@@ -104,7 +104,10 @@ class TorchvisionEval:
 
         # They are trained on ImageNet but evaluated on CIFAR10 here
         #   -> recalculate the BatchNorms
-        if not self.hparams.ignore_bn:
+        if (
+                not self.hparams.ignore_bn
+                and self.hparams.dataset != "imagenet"  # already trained on imagenet
+        ):
             recalculate_batch_norms(self.model_a, self.train_dl_a, 0, device, verbose)
             recalculate_batch_norms(self.model_b, self.train_dl_b, 0, device, verbose)
 
