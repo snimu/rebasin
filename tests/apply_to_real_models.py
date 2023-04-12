@@ -148,6 +148,7 @@ class TorchvisionEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
+            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
             verbose=verbose
         )
         lerp.interpolate(steps=20)
