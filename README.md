@@ -144,7 +144,7 @@ but seems unavailable. Please correct me if I'm wrong).
 I will try to gain that access and repeat the experiments.
 For now, these results have to suffice; I think that they are still interesting.
 
-**Caveat 2**: For the models with BatchNorm, I did not recalculate the 
+**Caveat 2**: For many of the models with BatchNorm, I did not recalculate the 
 BatchNorm statistics before or after rebasing, even though it is recommended
 (and a good idea to do when facing a new dataset). 
 I also only used 10% of the evaluation dataset for evaluation.
