@@ -153,8 +153,9 @@ because I cannot afford to rent an A100 for a week.
 **Those models are marked with a \*.**
 
 **Caveat 3**: I did not include the results for all models below,
-so if you want to see more, look at the files in [tests/results/](tests/results/)
-and [tests/results/images](tests/results/images).
+so if you want to see more, look at the files in 
+[tests/results/torchvision/cifar10](tests/results/torchvision/cifar10)
+and [tests/results/torchvision/cifar10/images](tests/results/torchvision/cifar10/images).
 
 ---
 
