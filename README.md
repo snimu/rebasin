@@ -181,11 +181,11 @@ and [tests/results/torchvision/cifar10/images](tests/results/torchvision/cifar10
 
 #### vit_b_16
 
-Weights key:
-
-- `model_a`: ViT_B_16_Weights.IMAGENET1K_V1
-- `model_b_original`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1
-- `model_b_rebasin`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1_REBASIN
+> Weights key:
+> 
+> - `model_a`: ViT_B_16_Weights.IMAGENET1K_V1
+> - `model_b_original`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1
+> - `model_b_rebasin`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1_REBASIN
 
 Comparing the losses of the original models and the rebasined model, 
 we can see that [takeaways 1 and 2](#general-takeaways) are true:
@@ -213,11 +213,11 @@ Again, testing on ImageNet is crucial here! I will attempt to do so in the futur
 
 #### wide_resnet50_2
 
-Weights key:
-
-- `model_a`: Wide_ResNet50_2_Weights.IMAGENET1K_V2
-- `model_b_original`: Wide_ResNet50_2_Weights.IMAGENET1K_V1
-- `model_b_rebasin`: Wide_ResNet50_2_Weights.IMAGENET1K_V1_REBASIN
+> Weights key:
+> 
+> - `model_a`: Wide_ResNet50_2_Weights.IMAGENET1K_V2
+> - `model_b_original`: Wide_ResNet50_2_Weights.IMAGENET1K_V1
+> - `model_b_rebasin`: Wide_ResNet50_2_Weights.IMAGENET1K_V1_REBASIN
 
 This is a model with `BatchNorm`s in it. In this case, the `BatchNorm` statistics
 were recalculated for every single model that was evaluated. For evaluation,
@@ -241,11 +241,11 @@ is better than `model_b_original`!
 
 #### efficientnet_b1*
 
-Weights key:
-
-- `model_a`: EfficientNet_B1_Weights.IMAGENET1K_V2
-- `model_b_original`: EfficientNet_B1_Weights.IMAGENET1K_V1
-- `model_b_rebasin`: EfficientNet_B1_Weights.IMAGENET1K_V1_REBASIN
+> Weights key:
+> 
+> - `model_a`: EfficientNet_B1_Weights.IMAGENET1K_V2
+> - `model_b_original`: EfficientNet_B1_Weights.IMAGENET1K_V1
+> - `model_b_rebasin`: EfficientNet_B1_Weights.IMAGENET1K_V1_REBASIN
 
 From both the losses of the original models and the rebasined model,
 as well as the losses of the interpolated models, we can see that
