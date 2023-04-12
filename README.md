@@ -186,8 +186,8 @@ and [tests/results/torchvision/cifar10/images](tests/results/torchvision/cifar10
 <summary>Expand for naming key</summary>
 
 - `model_a`: ViT_B_16_Weights.IMAGENET1K_V1
-- `model_b_original`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1
-- `model_b_rebasin`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1_REBASIN
+- `model_b_original`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1 (orig)
+- `model_b_rebasin`: ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1 (rebasin)
 
 </details>
 
@@ -222,8 +222,8 @@ Again, testing on ImageNet is crucial here! I will attempt to do so in the futur
 <summary>Expand for naming key</summary>
 
 - `model_a`: Wide_ResNet50_2_Weights.IMAGENET1K_V2
-- `model_b_original`: Wide_ResNet50_2_Weights.IMAGENET1K_V1
-- `model_b_rebasin`: Wide_ResNet50_2_Weights.IMAGENET1K_V1_REBASIN
+- `model_b_original`: Wide_ResNet50_2_Weights.IMAGENET1K_V1 (orig)
+- `model_b_rebasin`: Wide_ResNet50_2_Weights.IMAGENET1K_V1 (rebasin)
 
 </details>
 
@@ -254,8 +254,8 @@ is better than `model_b_original`!
 <summary>Expand for naming key</summary>
 
 - `model_a`: EfficientNet_B1_Weights.IMAGENET1K_V2
-- `model_b_original`: EfficientNet_B1_Weights.IMAGENET1K_V1
-- `model_b_rebasin`: EfficientNet_B1_Weights.IMAGENET1K_V1_REBASIN
+- `model_b_original`: EfficientNet_B1_Weights.IMAGENET1K_V1 (orig)
+- `model_b_rebasin`: EfficientNet_B1_Weights.IMAGENET1K_V1 (rebasin)
 
 </details>
 

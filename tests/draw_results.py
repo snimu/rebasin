@@ -48,8 +48,9 @@ def get_info(file: str, dataset: str) -> tuple[SweepInfo, SweepInfo, SweepInfo]:
     model_name = file[:-4]  # remove .csv
     minfo = [m for m in MODELS_AND_WEIGHTS if m.constructor.__name__ == model_name][0]
     wa = str(minfo.weights_a)
-    wb_orig = str(minfo.weights_b)
-    wb_rebasin = wb_orig + "_REBASIN"
+    wb = str(minfo.weights_b)
+    wb_orig = wb + " (orig)"
+    wb_rebasin = wb + " (rebasin)"
 
     sweep_a_b_orig: list[float] = []
     sweep_a_b_rebasin: list[float] = []
@@ -193,17 +194,18 @@ def line_plot(file: str, dataset: str = "cifar10") -> None:
         #   and plot & label it if it's not the first or last point
         minloss_idx = np.argmin(sweeps[i].losses)
         minloss = sweeps[i].losses[minloss_idx]
+        minlabel = f"min: {minloss:.2f} (%={xlabels[minloss_idx]:.2f})"
         omin = ax.plot(
             xlabels[minloss_idx],
             sweeps[i].losses[minloss_idx],
             'o',
             color='green',
-            label=f"min: {minloss:.2f}"
+            label=minlabel
         )
 
         # Add a legend
         objs = [oa[0], omin[0], ob[0]]
-        labels = [f"w_a: {loss0:.2f}", f"min: {minloss:.2f}", f"w_b: {loss1:.2f}"]
+        labels = [f"w_a: {loss0:.2f}", minlabel, f"w_b: {loss1:.2f}"]
         colors = ['red', 'green', 'blue']
 
         ax.legend(
