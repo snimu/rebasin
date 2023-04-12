@@ -296,7 +296,7 @@ Here, I present my near-term plans for this package. They may change.
 
 ## Acknowledgements
 
-**The paper:**
+**Git Re-Basin:**
 
 ```
 Ainsworth, Samuel K., Jonathan Hayase, and Siddhartha Srinivasa. 
@@ -305,6 +305,20 @@ arXiv preprint arXiv:2209.04836 (2022).
 ```
 
 Link: https://arxiv.org/abs/2209.04836 (accessed on April 9th, 2023)
+
+
+**ImageNet:**
+
+I've used the ImageNet Data from the 2012 ILSVRC competition.
+
+```
+Olga Russakovsky*, Jia Deng*, Hao Su, Jonathan Krause, Sanjeev Satheesh, 
+Sean Ma, Zhiheng Huang, Andrej Karpathy, Aditya Khosla, Michael Bernstein, 
+Alexander C. Berg and Li Fei-Fei. (* = equal contribution) 
+ImageNet Large Scale Visual Recognition Challenge. arXiv:1409.0575, 2014
+```
+
+[Paper (link)](https://arxiv.org/abs/1409.0575) (Accessed on April 12th, 2023)
 
 
 **Models:**
