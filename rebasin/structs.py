@@ -64,6 +64,18 @@ class Permutation:
         x = x.moveaxis(0, axis)
         param.data = x
 
+    def __repr__(self) -> str:
+        parameters = '\n\t\t' + '\n\t\t'.join(
+            f'{p.name}: axis={p.axis}, shape={p.param_b.shape}' for p in self.parameters
+        )
+        return (
+            f"Permutation("
+            f"\n\tperm_indices: {self.perm_indices}"
+            f"\n\tparameters: "
+            f"{parameters}"
+            f"\n)"
+        )
+
 
 @dataclass
 class ModelInfo:
