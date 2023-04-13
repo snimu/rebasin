@@ -167,6 +167,10 @@ def model_info(model: nn.Module) -> ModelInfo:
         The :class:`ModelInfo` object containing the desired information.
     """
     name = model.__class__.__name__
+    contains_batch_norm = any(
+        isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
+        for m in model.modules()
+    )
     num_parameters = sum(p.numel() for p in model.parameters())
     num_weights = sum(1 if "weight" in n else 0 for n, _ in model.named_parameters())
     num_biases = sum(1 if "bias" in n else 0 for n, _ in model.named_parameters())
@@ -199,6 +203,7 @@ def model_info(model: nn.Module) -> ModelInfo:
 
     return ModelInfo(
         name=name,
+        contains_batch_norm=contains_batch_norm,
         num_parameters=num_parameters,
         num_weights=num_weights,
         num_biases=num_biases,

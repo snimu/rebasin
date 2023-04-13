@@ -73,6 +73,10 @@ class ModelInfo:
     Attributes:
         name:
             The name of the model.
+        contains_batch_norm:
+            Whether the model contains BatchNorms.
+            This is relevant because BatchNorms have to have their
+            statistics recalculated after a permutation & interpolation.
         num_parameters:
             The total number of parameters in the model.
         num_weights:
@@ -97,6 +101,7 @@ class ModelInfo:
             The standard deviation of the number of elements in each bias parameter.
     """
     name: str
+    contains_batch_norm: bool
     num_parameters: int
     num_weights: int
     num_elements_per_weight: list[int]
@@ -112,6 +117,7 @@ class ModelInfo:
         return (
             f"ModelInfo: "
             f"\n\tname: {self.name}"
+            f"\n\tcontains_batch_norm: {self.contains_batch_norm}"
             f"\n\tnum_parameters: {self._pretty_num_str(self.num_parameters)}"
             f"\n\tnum_weights: {self._pretty_num_str(self.num_weights)}"
             f"\n\tnum_elements_per_weight: "
@@ -135,6 +141,7 @@ class ModelInfo:
         return (
             f"ModelInfo("
             f"name={self.name}, "
+            f"contains_batch_norm={self.contains_batch_norm}, "
             f"num_parameters={self._pretty_num_str(self.num_parameters)}, "
             f"num_weights={self._pretty_num_str(self.num_weights)}, "
             f"num_elements_per_weight="
