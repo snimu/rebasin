@@ -25,19 +25,54 @@ from tests.fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
 class TorchvisionEval:
     def __init__(self) -> None:
         parser = argparse.ArgumentParser()
-        parser.add_argument("-a", "--all", action="store_true", default=False)
-        parser.add_argument("-b", "--batch_size", type=int, default=64)
-        parser.add_argument("-d", "--dataset", type=str, default="cifar10")
-        parser.add_argument("-e", "--exclude", type=str, nargs='*')
-        parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
-        parser.add_argument("-m", "--models", type=str, nargs='*')
+        parser.add_argument(
+            "-a", "--all",
+            action="store_true", default=False,
+            help="If this flag is set, all models are evaluated. "
+                 "Overrides --models. "
+                 "Is overridden by --exclude, meaning that if --all is set "
+                 "and --exclude is not empty, then all models except those "
+                 "in --exclude are evaluated."
+        )
+        parser.add_argument(
+            "-b", "--batch_size",
+            type=int, default=64,
+            help="Batch size to use for evaluation."
+        )
+        parser.add_argument(
+            "-d", "--dataset",
+            type=str, default="cifar10",
+            help="Dataset to evaluate on. Must be cifar10 or imagenet."
+        )
+        parser.add_argument(
+            "-e", "--exclude",
+            type=str, nargs='*',
+            help="Models to exclude from evaluation."
+        )
+        parser.add_argument(
+            "-i", "--ignore_bn",
+            action="store_true", default=False,
+            help="If this flag is set, BatchNorm statistics are not recalculated."
+        )
+        parser.add_argument(
+            "-m", "--models",
+            type=str, nargs='*',
+            help="Models to evaluate. If --all is True, then this is ignored.")
         parser.add_argument(
             "-p", "--percent_eval",
             type=float, default=100,
             help="Percent of data to evaluate on. Between 0 and 100."
         )
-        parser.add_argument("-s", "--steps", type=int, default=20)
-        parser.add_argument("-v", "--verbose", action="store_true", default=True)
+        parser.add_argument(
+            "-s", "--steps",
+            type=int, default=20,
+            help="Number of interpolation steps per interpolation."
+        )
+        parser.add_argument(
+            "-v", "--verbose",
+            action="store_true", default=True,
+            help="If this flag is set, progress is printed."
+        )
 
         self.hparams = parser.parse_args()
 
