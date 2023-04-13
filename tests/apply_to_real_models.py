@@ -25,41 +25,48 @@ from tests.fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
 class TorchvisionEval:
     def __init__(self) -> None:
         parser = argparse.ArgumentParser()
-        parser.add_argument("-m", "--models", type=str, nargs='*')
         parser.add_argument("-a", "--all", action="store_true", default=False)
-        parser.add_argument("-v", "--verbose", action="store_true", default=True)
-        parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
         parser.add_argument("-b", "--batch_size", type=int, default=64)
         parser.add_argument("-d", "--dataset", type=str, default="cifar10")
-        parser.add_argument("-s", "--steps", type=int, default=20)
+        parser.add_argument("-e", "--exclude", type=str, nargs='*')
+        parser.add_argument("-i", "--ignore_bn", action="store_true", default=False)
+        parser.add_argument("-m", "--models", type=str, nargs='*')
         parser.add_argument(
             "-p", "--percent_eval",
             type=float, default=100,
             help="Percent of data to evaluate on. Between 0 and 100."
         )
+        parser.add_argument("-s", "--steps", type=int, default=20)
+        parser.add_argument("-v", "--verbose", action="store_true", default=True)
 
         self.hparams = parser.parse_args()
 
         assert self.hparams.dataset in ("cifar10", "imagenet"), \
-            "Dataset must be cifar10 or imagenet"
+            "--dataset must be cifar10 or imagenet"
 
-        assert self.hparams.steps > 0, "Interpolate for at least one step!"
+        assert self.hparams.steps > 0, "--steps must be at least one!"
 
-        if self.hparams.models is not None and not self.hparams.all:
-            assert self.hparams.models, "Must specify models or all"
+        if not self.hparams.all:
+            assert self.hparams.models, "Must specify --models or --all"
 
         if self.hparams.models is None:
             self.hparams.models = []
-            assert self.hparams.all, "Must specify models or all"
+            assert self.hparams.all, "Must specify --models or --all"
 
         if self.hparams.all:
             self.hparams.models = MODEL_NAMES
 
         for model_name in self.hparams.models:
-            assert model_name in MODEL_NAMES, f"{model_name} not in MODEL_NAMES"
+            assert model_name in MODEL_NAMES, \
+                f"--models: {model_name} not in MODEL_NAMES"
 
-        assert self.hparams.batch_size > 0, "Batch size must be greater than 0"
-        assert 0 < self.hparams.percent_eval <= 100, "Percent eval must be in ]0, 100]"
+        for model_name in self.hparams.exclude:
+            assert model_name in MODEL_NAMES, \
+                f"--exclude: {model_name} not in MODEL_NAMES"
+
+        assert self.hparams.batch_size > 0, "--batch_size must be greater than 0"
+        assert 0 < self.hparams.percent_eval <= 100, \
+            "--percent_eval must be in ]0, 100]"
         self.hparams.percent_eval = self.hparams.percent_eval / 100
 
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
@@ -312,6 +319,7 @@ class TorchvisionEval:
         mandw = [
             minfo for minfo in MODELS_AND_WEIGHTS
             if minfo.constructor.__name__ in self.hparams.models
+            and minfo.constructor.__name__ not in self.hparams.exclude
         ]
 
         for i, minfo in enumerate(mandw):
