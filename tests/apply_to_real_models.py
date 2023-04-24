@@ -169,7 +169,6 @@ class TorchvisionEval:
         rebasin = PermutationCoordinateDescent(
             self.model_a,
             self.model_b,
-            input_data=input_data,
             device_b=device,
             verbose=verbose
         )

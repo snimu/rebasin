@@ -79,7 +79,6 @@ class BenchmarkPermutationCoordinateDescent:
             model_name: str,
             model_a_type: Any,
             model_b_type: Any,
-            input_data: Any,
             iters: int = 100,
             device_a: str = "cpu",
             device_b: str = "cpu",
@@ -99,7 +98,6 @@ class BenchmarkPermutationCoordinateDescent:
                 pcd = PermutationCoordinateDescent(
                     model_a_type(),
                     model_b_type(),
-                    input_data,
                     device_a=device_a,
                     device_b=device_b
                 )
@@ -130,7 +128,6 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet18",
             resnet18,
             resnet18,
-            torch.randn(1, 3, 224, 224),
             iters,
             device,
             device,
@@ -148,7 +145,6 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet34",
             resnet34,
             resnet34,
-            torch.randn(1, 3, 224, 224),
             iters,
             device,
             device,
@@ -166,7 +162,6 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet50",
             resnet50,
             resnet50,
-            torch.randn(1, 3, 224, 224),
             iters,
             device,
             device,
@@ -184,7 +179,6 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet101",
             resnet101,
             resnet101,
-            torch.randn(1, 3, 224, 224),
             iters,
             device,
             device,
@@ -202,7 +196,6 @@ class BenchmarkPermutationCoordinateDescent:
             "ResNet152",
             resnet152,
             resnet152,
-            torch.randn(1, 3, 224, 224),
             iters,
             device,
             device,
@@ -218,7 +211,6 @@ class BenchmarkPermutationCoordinateDescent:
             pcd = PermutationCoordinateDescent(
                 model_a=model_a,
                 model_b=model_b,
-                input_data=torch.randn(850).to("cuda"),
                 verbose=True,
                 device_a="cpu",
                 device_b="cuda"

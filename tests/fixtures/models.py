@@ -10,7 +10,7 @@ class MLP(nn.Module):
     """A Multi-Layer-Perceptron."""
 
     def __init__(
-            self, in_features: int, out_features: int = -1, num_layers: int = 5
+            self, in_features: int, num_layers: int = 5
     ) -> None:
         super().__init__()
 
@@ -28,7 +28,6 @@ class MLP(nn.Module):
             )
 
         self.model = nn.Sequential(*layers)
-        self.out_features = out_features
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         out: torch.Tensor = self.model(inputs)

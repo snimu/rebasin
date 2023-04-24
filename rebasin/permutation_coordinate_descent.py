@@ -8,7 +8,7 @@ from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
-from rebasin._init_perms_weight_matching import PermutationInitializer
+from rebasin.initialization.initializer import PermutationInitializer
 
 
 def calculate_progress(
@@ -70,9 +70,6 @@ class PermutationCoordinateDescent:
             The target model.
         model_b:
             The model that will have its weights permuted.
-        input_data:
-            One batch of input data to trace the model's layout.
-            Assumed to be on :code:`device_b`.
         device_a:
             The device on which :code:`model_a` is located.
             Both :code:`model_a` and :code:`model_b` must
@@ -90,7 +87,6 @@ class PermutationCoordinateDescent:
             self,
             model_a: nn.Module,
             model_b: nn.Module,
-            input_data: Any,
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
             verbose: bool = False
@@ -103,8 +99,7 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Initializing permutations...")
 
-        pinit = PermutationInitializer(model_a, model_b, input_data, verbose=verbose)
-        self.permutations = pinit.permutations
+        self.permutations = PermutationInitializer(model_a, model_b).permutations
 
         if verbose:
             print("Done.")
@@ -144,7 +139,7 @@ class PermutationCoordinateDescent:
             n = len(permutation.perm_indices)
             cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
-            for param_info in permutation.parameters:
+            for param_info in permutation.param_infos:
                 axis = param_info.axis
                 # Copy so that the original parameter isn't moved to device_b.
                 # If this were not done, then in one of the later steps,
