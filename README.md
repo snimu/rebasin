@@ -10,6 +10,11 @@ An implementation of methods described in
 
 Can be applied to **arbitrary models**, without modification.
 
+**ATTENTION: I found a severe bug in my code, and am in the process of fixing it. 
+Disregard the results below.**
+
+---
+
 **Table of Contents**
 
 - [Installation](#installation)
