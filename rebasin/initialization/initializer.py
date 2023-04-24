@@ -12,6 +12,7 @@ class PermutationInitializer:
         self.model_b = model_b
         self._perm_len_to_perm: dict[int, Permutation] = {}
         self.permutations: list[Permutation] = []
+        self.param_to_param_infos: dict[nn.Parameter, list[ParameterInfo]] = {}
         self._init_permutations()
 
     def _init_permutations(self) -> None:
@@ -25,12 +26,15 @@ class PermutationInitializer:
             for param_info in param_infos:
                 ax_len = param_info.param_a.shape[param_info.axis]
                 if ax_len not in self._perm_len_to_perm:
-                    self._perm_len_to_perm[ax_len] = Permutation(
-                        perm_indices=torch.arange(ax_len),
-                        param_infos=[param_info],
-                    )
+                    perm = Permutation(param_infos=[param_info])
+                    self._perm_len_to_perm[ax_len] = perm
                 else:
                     self._perm_len_to_perm[ax_len].param_infos.append(param_info)
+
+                if parameter_b not in self.param_to_param_infos:
+                    self.param_to_param_infos[parameter_b] = [param_info]
+                else:
+                    self.param_to_param_infos[parameter_b].append(param_info)
 
         for permutation in self._perm_len_to_perm.values():
             self.permutations.append(permutation)

@@ -5,24 +5,47 @@ The definition of a permutation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NamedTuple
 
 import torch
 from torch import nn
 
 
-class ParameterInfo(NamedTuple):
+@dataclass
+class ParameterInfo:
     param_a: nn.Parameter
     param_b: nn.Parameter
     name: str
     axis: int
 
+    def __post_init__(self) -> None:
+        ax_len = self.param_a.shape[self.axis]
+        self.perm_indices = torch.arange(ax_len)
+
 
 @dataclass
 class Permutation:
     # Permutation is done with these indices (w[axis] = w[axis][perm_indices]).
-    perm_indices: torch.Tensor
     param_infos: list[ParameterInfo]
+
+
+    def __post_init__(self) -> None:
+        self._perm_indices = self.param_infos[0].perm_indices
+        for param_info in self.param_infos[1:]:
+            if not torch.equal(self._perm_indices, param_info.perm_indices):
+                raise ValueError(
+                    f"Permutation indices do not match: "
+                    f"{self._perm_indices} != {param_info.perm_indices}"
+                )
+
+    @property
+    def perm_indices(self) -> torch.Tensor:
+        return self._perm_indices
+
+    @perm_indices.setter
+    def perm_indices(self, perm_indices: torch.Tensor) -> None:
+        self._perm_indices = perm_indices
+        for param_info in self.param_infos:
+            param_info.perm_indices = perm_indices
 
     def apply(self) -> None:
         """Apply the permutation to all parameters in this permutation."""

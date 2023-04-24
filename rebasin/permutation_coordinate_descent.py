@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
 
 import torch
 from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
+from rebasin.initialization._permutation import Permutation
 from rebasin.initialization.initializer import PermutationInitializer
 
 
@@ -99,7 +99,9 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Initializing permutations...")
 
-        self.permutations = PermutationInitializer(model_a, model_b).permutations
+        pinit = PermutationInitializer(model_a, model_b)
+        self.permutations = pinit.permutations
+        self.param_to_param_infos = pinit.param_to_param_infos
 
         if verbose:
             print("Done.")
@@ -149,6 +151,19 @@ class PermutationCoordinateDescent:
                 #   by splitting their memory needs.
                 w_a = copy.deepcopy(param_info.param_a).to(self.device_b)
                 w_b = copy.deepcopy(param_info.param_b).to(self.device_b)
+
+                # We want to permute every axis except the one of interest.
+                # This way, the connection between the different permutations
+                #   is created.
+                for pinfo in self.param_to_param_infos[param_info.param_b]:
+                    if pinfo.axis == axis:
+                        continue
+                    Permutation.permute_parameter(
+                        w_a, axis=pinfo.axis, perm_indices=pinfo.perm_indices
+                    )
+                    Permutation.permute_parameter(
+                        w_b, axis=pinfo.axis, perm_indices=pinfo.perm_indices
+                    )
 
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
