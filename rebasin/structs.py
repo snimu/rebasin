@@ -183,23 +183,14 @@ class ModelInfo:
 
     @staticmethod
     def _pretty_num_str(num: int | float) -> str:
-        numstr = ""
-
         rest = 0.0
         if isinstance(num, float):
             rest = num % 1
             num = int(num)
 
-        numstr_ = str(num)
-        for i, char in enumerate(reversed(numstr_)):
-            if i % 3 == 0 and i != 0:
-                numstr += "_"
-            numstr += char
+        numstr = f"{num:_}"
 
-        numstr = numstr[::-1]
-
-        if rest != 0.0:
-            reststr = str(rest).split(".")[1][:3]
-            numstr += f".{reststr}"
+        if rest:
+            numstr += f".{str(rest).split('.')[1][:3]}"
 
         return numstr
