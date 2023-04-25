@@ -1,56 +1,42 @@
 ## General
 
-Problem: For large models, `Interpolation` & `PermutationCoordinateDescent` 
-might need too much memory for one device.
+Initialization of Permutations.
 
-Solution: 
-
-1. Allow for multi-device work.
-2. Allow for giving models by savepath, and only ever load two at once.
-
-```python
-from pathlib import Path
-from typing import Any, Sequence
-
-import torch
-from torch import nn
-
-
-class Interpolation:
-    def __init__(
-            self, 
-            models: Sequence[nn.Module | Path | str],
-            model_devices: Sequence[torch.device | str] | None = None,
-            interp_device: torch.device | str | None = None,
-    ) -> None:
-        ...
-
-
-class PermutationCoordinateDescent:
-    def __init__(
-            self, 
-            model_a: nn.Module | Path | str,
-            model_b: nn.Module | Path | str,
-            input_data: Any,  # assumed to be on device_b
-            device_a: torch.device | str | None = None,
-            device_b: torch.device | str | None = None,
-    ) -> None:
-        ...
-
-
-class PermutationInitializer:
-    def __init__(
-            self, 
-            model_a: nn.Module | Path | str,
-            model_b: nn.Module | Path | str,
-            input_data: Any,  # assumed to be on device_b
-            device_a: torch.device | str | None = None,
-            device_b: torch.device | str | None = None,
-    ) -> None:
-        ...
-```
-
-The same basic principle of course applies wherever two models interact.
+- Use paths
+- In linear paths: just connect the previous with the current layer
+- Work with `rebasin.Parameter`s, not `Permutation`s!
+  - This way, I can easily permute the parameters, 
+     and add an `except_axis` argument for `PermutationCoordinateDescent`
+  - Different `rebasin.Parameter`s would share one `Permutation` &rarr; 
+     I can achieve the `Permutation` sharing, but can handle the parameters 
+     more elegantly
+- In Residual Paths:
+  - Find a mirror-point in the center
+  - Mirror the permutations along it
+  - This way, the permutations are always symmetric and the residual path is 
+     the identity permutation when seen from the rest of the model
+  - Example:
+     ```markdown
+        (P2, P1)
+        (P3, P2)
+        (P4, P3)
+    
+        (P4, P4)
+    
+        (P3, P4)
+        (P2, P3)
+        (P1, P2)
+    ```
+    Or, alternatively:
+    ```markdown
+        (P1, P2)
+        (P2, P3)
+        (P3, P2)
+        (P2, P1)
+    ```
+    - Then, connect the short path and the long path, if there is something in the short path.
+    - Finnally, connect the first and last `rebasin.Parameter` with a 
+       `rebasin.LinearPath`
 
 
 ## `Rebasin`
