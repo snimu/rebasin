@@ -10,18 +10,6 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from rebasin.util import reverse_permutation
-
-
-def test_reverse_permutation() -> None:
-    """Demonstrate that ~reverse_permutation works as intended."""
-    for _ in range(10):
-        perm = torch.randperm(10)
-        rev_perm = reverse_permutation(perm)
-
-        x = torch.randn(10)
-        assert torch.allclose(x[perm][rev_perm], x)
-
 
 def test_model_output_consistency_tensors() -> None:
     """
@@ -186,7 +174,7 @@ class TestLayerNorm:
         lin.weight.data = lin.weight.data[perm]
         ln.weight.data = ln.weight.data[perm]
         y_new = model(x)
-        rev_perm = reverse_permutation(perm)
+        rev_perm = torch.argsort(perm)
         y_new = y_new[rev_perm]
 
         assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
@@ -269,7 +257,7 @@ class TestBatchNorm1d:
         bn.weight.data = bn.weight.data[perm]
         bn.reset_running_stats()
         y_new = model(x)
-        rev_perm = reverse_permutation(perm)
+        rev_perm = torch.argsort(perm)
         y_new = y_new[:, rev_perm]
 
         assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
