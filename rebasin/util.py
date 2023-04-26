@@ -155,6 +155,21 @@ def contains_parameter(
     return any(param is parameter for param in parameters)
 
 
+def reverse_permutation(perm_indices: torch.Tensor) -> torch.Tensor:
+    """
+    Create a new permutation that reverses the effects of the old.
+
+    :param perm_indices: The old permutation.
+    :return: permutation indices that counteract the given ones,
+    such that the result of applying them successively is the identity.
+    """
+    reverse_indices = torch.empty_like(perm_indices)
+    for i, perm_idx in enumerate(perm_indices):
+        reverse_indices[perm_idx] = i
+
+    return reverse_indices
+
+
 def model_info(model: nn.Module) -> ModelInfo:
     """
     Get information about a model.

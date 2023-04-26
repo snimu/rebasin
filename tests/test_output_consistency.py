@@ -10,6 +10,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from rebasin.util import reverse_permutation
+
 
 def test_model_output_consistency_tensors() -> None:
     """
@@ -139,3 +141,62 @@ class TestConsistencyConv2d:
             y_new = model(x)
 
             assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
+class TestLayerNorm:
+    @staticmethod
+    def test_multiplication_function() -> None:
+        ln_norm = nn.LayerNorm(10)
+        ln_weight = nn.LayerNorm(10)
+        ln_weight.weight.data *= torch.randn(10)
+
+        x = torch.randn(10)
+
+        y_norm = ln_norm(x)
+        y_weight = ln_weight(x)
+
+        # LayerNorm normalizes, and then multiplies **element-wise**!
+        assert torch.allclose(y_norm * ln_weight.weight.data, y_weight)
+
+    @staticmethod
+    def test_layernorm_after_linear() -> None:
+        """If a model ends in a LayerNorm, then output has to be permuted
+        by the inverse of the permutation that was applied to the weights
+        of the LayerNorm."""
+        lin = nn.Linear(10, 10, bias=False)
+        ln = nn.LayerNorm(10)
+        # Adjust LayerNorm weight to be non-identity
+        ln.weight.data *= torch.randn(10)
+        model = nn.Sequential(lin, ln)
+
+        x = torch.randn(10)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        lin.weight.data = lin.weight.data[perm]
+        ln.weight.data = ln.weight.data[perm]
+        y_new = model(x)
+        rev_perm = reverse_permutation(perm)
+        y_new = y_new[rev_perm]
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_layernorm_between_linears() -> None:
+        lin1 = nn.Linear(10, 10, bias=False)
+        ln = nn.LayerNorm(10)
+        lin2 = nn.Linear(10, 10, bias=False)
+        # Adjust LayerNorm weight to be non-identity
+        ln.weight.data *= torch.randn(10)
+        model = nn.Sequential(lin1, ln, lin2)
+
+        x = torch.randn(10)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        lin1.weight.data = lin1.weight.data[perm]
+        ln.weight.data = ln.weight.data[perm]
+        lin2.weight.data = lin2.weight.data[:, perm]
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
