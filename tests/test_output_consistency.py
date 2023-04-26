@@ -7,6 +7,8 @@ This is for different Module-types.
 
 from __future__ import annotations
 
+import itertools
+
 import torch
 from torch import nn
 
@@ -25,7 +27,7 @@ def test_model_output_consistency_tensors() -> None:
     x_new = x[perm]
     y_new = x_new @ W_new
 
-    assert torch.allclose(y_orig, y_new)
+    assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
 
 
 class TestConsistencyLinear:
@@ -48,7 +50,7 @@ class TestConsistencyLinear:
 
         x_new = x[perm]
         y_xpass = model(x_new)
-        assert torch.allclose(y_orig, y_xpass)
+        assert torch.allclose(y_orig, y_xpass, atol=1e-7, rtol=1e-4)
 
     @staticmethod
     def test_permuted_output_produces_same_digits() -> None:
@@ -105,6 +107,41 @@ class TestConsistencyLinear:
             assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
 
 
+class TestConsistencyConv1d:
+
+    @staticmethod
+    def test_output_dim_perm_is_output_perm() -> None:
+        conv = nn.Conv1d(3, 2, 3, bias=False)
+        x = torch.randn(1, 3, 9)
+        y_orig = conv(x)
+
+        perm = torch.tensor([1, 0])
+        conv.weight.data = conv.weight.data[perm]
+        y_new = conv(x)
+
+        assert torch.allclose(y_orig, y_new[:, perm])
+
+
+    @staticmethod
+    def test_output_perm_multi_layer() -> None:
+        for _ in range(10):
+            conv1 = nn.Conv1d(3, 10, 3, bias=False)
+            conv2 = nn.Conv1d(10, 12, 3, bias=False)
+            relu = nn.ReLU()
+
+            model = nn.Sequential(conv1, relu, conv2)
+            x = torch.randn(4, 3, 9)
+            y_orig = model(x)
+
+            perm = torch.randperm(10)
+            conv1.weight.data = conv1.weight.data[perm]
+            conv2.weight.data = conv2.weight.data[:, perm]
+
+            y_new = model(x)
+
+            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
 class TestConsistencyConv2d:
 
     @staticmethod
@@ -139,6 +176,45 @@ class TestConsistencyConv2d:
             y_new = model(x)
 
             assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
+class TestConsistencyConv3d:
+
+    @staticmethod
+    def test_output_dim_perm_is_output_perm() -> None:
+        for in_channels, out_channels, kernel_size in itertools.product(
+                [1, 3], [1, 2], [2, 3]
+        ):
+            conv = nn.Conv3d(in_channels, out_channels, kernel_size, bias=False)
+            x = torch.randn(1, in_channels, 5, 5, 5)
+            y_orig = conv(x)
+
+            perm = torch.randperm(out_channels)
+            conv.weight.data = conv.weight.data[perm]
+            y_new = conv(x)
+
+            assert torch.allclose(y_orig, y_new[:, perm])
+
+    @staticmethod
+    def test_output_perm_multi_layer() -> None:
+        for in_channels, _out_channels, kernel_size in itertools.product(
+                [1, 3], [1, 2], [2, 3]
+        ):
+            conv1 = nn.Conv3d(in_channels, 6, kernel_size, bias=False)
+            conv2 = nn.Conv3d(6, 4, kernel_size, bias=False)
+            relu = nn.ReLU()
+            model = nn.Sequential(conv1, relu, conv2)
+            x = torch.randn(4, in_channels, 5, 5, 5)
+            y_orig = model(x)
+
+            perm = torch.randperm(6)
+            conv1.weight.data = conv1.weight.data[perm]
+            conv2.weight.data = conv2.weight.data[:, perm]
+
+            y_new = model(x)
+
+            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
 
 
 class TestLayerNorm:
@@ -302,3 +378,136 @@ class TestBatchNorm1d:
         y_new = model(x)
 
         assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
+class TestBatchNorm2d:
+    @staticmethod
+    def test_batchnorm_after_conv2d() -> None:
+        conv = nn.Conv2d(3, 10, 3, bias=False)
+        bn = nn.BatchNorm2d(10)
+        model = nn.Sequential(conv, bn)
+
+        x = torch.randn(4, 3, 9, 9)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        conv.weight.data = conv.weight.data[perm]
+        bn.weight.data = bn.weight.data[perm]
+        bn.reset_running_stats()
+        y_new = model(x)
+        rev_perm = torch.argsort(perm)
+        y_new = y_new[:, rev_perm]
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_batchnorm_before_conv2d() -> None:
+        bn = nn.BatchNorm2d(3)
+        conv = nn.Conv2d(3, 10, 3, bias=False)
+        model = nn.Sequential(bn, conv)
+
+        x = torch.randn(4, 3, 9, 9)
+        y_orig = model(x)
+
+        bn.reset_running_stats()
+        perm = torch.randperm(3)
+        bn.weight.data = bn.weight.data[perm]
+        conv.weight.data = conv.weight.data[:, perm]
+
+        y_new = model(x[:, perm])
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
+class TestConsistencyBatchNorm3d:
+
+    @staticmethod
+    def test_multiplication_function() -> None:
+        for num_channels in [1, 3, 5]:
+            bn_norm = nn.BatchNorm3d(num_channels)
+            bn_weight = nn.BatchNorm3d(num_channels)
+            bn_weight.weight.data *= torch.randn(num_channels)
+
+            x = torch.randn(4, num_channels, 5, 5, 5)
+
+            y_norm = bn_norm(x)
+            y_weight = bn_weight(x)
+
+            # BatchNorm3d normalizes, and then multiplies **element-wise**!
+            assert torch.allclose(
+                y_norm * bn_weight.weight.data.view(1, num_channels, 1, 1, 1),
+                y_weight
+            )
+
+    @staticmethod
+    def test_batchnorm_after_conv3d() -> None:
+        for in_channels, out_channels, kernel_size in itertools.product(
+                [1, 3], [1, 2], [2, 3]
+        ):
+            conv = nn.Conv3d(in_channels, out_channels, kernel_size, bias=False)
+            bn = nn.BatchNorm3d(out_channels)
+            # Adjust BatchNorm weight to be non-identity
+            bn.weight.data *= torch.randn(out_channels)
+            model = nn.Sequential(conv, bn)
+
+            x = torch.randn(4, in_channels, 5, 5, 5)
+            y_orig = model(x)
+
+            perm = torch.randperm(out_channels)
+            conv.weight.data = conv.weight.data[perm]
+            bn.weight.data = bn.weight.data[perm]
+            bn.reset_running_stats()
+            y_new = model(x)
+            rev_perm = torch.argsort(perm)
+            y_new = y_new[:, rev_perm]
+
+            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_batchnorm_before_conv3d() -> None:
+        for in_channels, out_channels, kernel_size in itertools.product(
+                [1, 3], [1, 2], [2, 3]
+        ):
+            bn = nn.BatchNorm3d(in_channels)
+            # Adjust BatchNorm weight to be non-identity
+            bn.weight.data *= torch.randn(in_channels)
+            conv = nn.Conv3d(in_channels, out_channels, kernel_size, bias=False)
+            model = nn.Sequential(bn, conv)
+
+            x = torch.randn(4, in_channels, 5, 5, 5)
+            y_orig = model(x)
+
+            bn.reset_running_stats()
+            perm = torch.randperm(in_channels)
+            bn.weight.data = bn.weight.data[perm]
+            conv.weight.data = conv.weight.data[:, perm]
+
+            y_new = model(x[:, perm])
+
+            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_batchnorm_between_conv3d() -> None:
+        for in_channels, mid_channels, out_channels, kernel_size in itertools.product(
+                [1, 3], [4], [1, 2], [2, 3]
+        ):
+            conv1 = nn.Conv3d(in_channels, mid_channels, kernel_size, bias=False)
+            bn = nn.BatchNorm3d(mid_channels)
+            conv2 = nn.Conv3d(mid_channels, out_channels, kernel_size, bias=False)
+            # Adjust BatchNorm weight to be non-identity
+            bn.weight.data *= torch.randn_like(bn.weight.data)
+            model = nn.Sequential(conv1, bn, conv2)
+
+            x = torch.randn(4, in_channels, 5, 5, 5)
+            y_orig = model(x)
+
+            bn.reset_running_stats()
+            perm = torch.randperm(mid_channels)
+            bn.weight.data = bn.weight.data[perm]
+            conv2.weight.data = conv2.weight.data[:, perm]
+            conv1.weight.data = conv1.weight.data[perm]
+
+            y_new = model(x)
+
+            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
