@@ -229,3 +229,88 @@ class TestLayerNorm:
         y_new = model(x)
 
         assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+
+class TestBatchNorm1d:
+    @staticmethod
+    def test_multiplication_function() -> None:
+        bn_norm = nn.BatchNorm1d(10)
+        bn_weight = nn.BatchNorm1d(10)
+        bn_weight.weight.data *= torch.randn(10)
+
+        x = torch.randn(3, 10)
+
+        y_norm = bn_norm(x)
+        y_weight = bn_weight(x)
+
+        # BatchNorm normalizes, and then multiplies **element-wise**!
+        assert torch.allclose(y_norm * bn_weight.weight.data, y_weight)
+
+    @staticmethod
+    def test_batchnorm_after_linear() -> None:
+        """If a model ends in a BatchNorm1d, then output has to be permuted
+        by the inverse of the permutation that was applied to the weights
+        of the BatchNorm1d.
+
+        However, in BatchNorm1d, that inverse has to be applied to the
+        input-dimension of the output!
+        """
+        lin = nn.Linear(10, 10, bias=False)
+        bn = nn.BatchNorm1d(10)
+        # Adjust BatchNorm weight to be non-identity
+        bn.weight.data *= torch.randn(10)
+        model = nn.Sequential(lin, bn)
+
+        x = torch.randn(3, 10)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        lin.weight.data = lin.weight.data[perm]
+        bn.weight.data = bn.weight.data[perm]
+        bn.reset_running_stats()
+        y_new = model(x)
+        rev_perm = reverse_permutation(perm)
+        y_new = y_new[:, rev_perm]
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_batchnorm_before_linear() -> None:
+        bn = nn.BatchNorm1d(10)
+        # Adjust BatchNorm weight to be non-identity
+        bn.weight.data *= torch.randn(10)
+        lin = nn.Linear(10, 10, bias=False)
+        model = nn.Sequential(bn, lin)
+
+        x = torch.randn(3, 10)
+        y_orig = model(x)
+
+        bn.reset_running_stats()
+        perm = torch.randperm(10)
+        bn.weight.data = bn.weight.data[perm]
+        lin.weight.data = lin.weight.data[:, perm]
+
+        y_new = model(x[:, perm])
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_batchnorm_between_linears() -> None:
+        lin1 = nn.Linear(10, 10, bias=False)
+        bn = nn.BatchNorm1d(10)
+        lin2 = nn.Linear(10, 10, bias=False)
+        # Adjust BatchNorm weight to be non-identity
+        bn.weight.data *= torch.randn(10)
+        model = nn.Sequential(lin1, bn, lin2)
+
+        x = torch.randn(3, 10)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        lin1.weight.data = lin1.weight.data[perm]
+        bn.weight.data = bn.weight.data[perm]
+        lin2.weight.data = lin2.weight.data[:, perm]
+        bn.reset_running_stats()
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
