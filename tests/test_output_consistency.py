@@ -13,6 +13,16 @@ from torch import nn
 from rebasin.util import reverse_permutation
 
 
+def test_reverse_permutation() -> None:
+    """Demonstrate that ~reverse_permutation works as intended."""
+    for _ in range(10):
+        perm = torch.randperm(10)
+        rev_perm = reverse_permutation(perm)
+
+        x = torch.randn(10)
+        assert torch.allclose(x[perm][rev_perm], x)
+
+
 def test_model_output_consistency_tensors() -> None:
     """
     Demonstrate that the output of a model is invariant to the
@@ -178,6 +188,25 @@ class TestLayerNorm:
         y_new = model(x)
         rev_perm = reverse_permutation(perm)
         y_new = y_new[rev_perm]
+
+        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+
+    @staticmethod
+    def test_layernorm_before_linear() -> None:
+        ln = nn.LayerNorm(10)
+        # Adjust LayerNorm weight to be non-identity
+        ln.weight.data *= torch.randn(10)
+        lin = nn.Linear(10, 10, bias=False)
+        model = nn.Sequential(ln, lin)
+
+        x = torch.randn(10)
+        y_orig = model(x)
+
+        perm = torch.randperm(10)
+        ln.weight.data = ln.weight.data[perm]
+        lin.weight.data = lin.weight.data[:, perm]
+
+        y_new = model(x[perm])  # permute input to match permutation of weights
 
         assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
 
