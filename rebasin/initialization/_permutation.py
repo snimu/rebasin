@@ -106,8 +106,6 @@ class ModuleParameters:
     name: str
     axis_to_permutation: dict[int, Perm]
 
-    inverse: bool = False  # Whether the permutation is inverted.
-
     # A parameter is either only a weight, or a weight with associated bias.
     # This is because the weights are used for associating permutations.
     # A bias is always associated with axis 0, the output axis.
@@ -140,14 +138,9 @@ class ModuleParameters:
         for axis, permutation in self.axis_to_permutation.items():
             if axis == except_axis:
                 continue
-            perm_indices = (
-                self.reverse_permutation(permutation.perm_indices)
-                if self.inverse
-                else permutation.perm_indices
-            )
-            self.permute_axis(self.weight_b, axis, perm_indices)
+            self.permute_axis(self.weight_b, axis, permutation.perm_indices)
             if self.bias_b is not None and axis == 0:  # axis 0 is output dim -> bias
-                self.permute_axis(self.bias_b, axis, perm_indices)
+                self.permute_axis(self.bias_b, axis, permutation.perm_indices)
 
     @staticmethod
     @torch.no_grad()
@@ -170,11 +163,3 @@ class ModuleParameters:
         x = x[perm_indices]
         x = x.moveaxis(0, axis)
         param.data = x
-
-    @staticmethod
-    def reverse_permutation(perm_indices: torch.Tensor) -> torch.Tensor:
-        reverse_indices = torch.empty_like(perm_indices)
-        for i, perm_idx in enumerate(perm_indices):
-            reverse_indices[perm_idx] = i
-
-        return reverse_indices

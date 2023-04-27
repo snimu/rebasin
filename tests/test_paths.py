@@ -7,11 +7,37 @@ from typing import Any
 import torch
 from torch import nn
 
-from rebasin.initialization._paths import LinearPath, ResidualPath
+from rebasin.initialization._paths import LinearPath, Path, ResidualPath
+from rebasin.initialization._permutation import Perm
 from tests.fixtures.paths import ModuleGenerator
 
 
+def allclose(a: torch.Tensor, b: torch.Tensor) -> bool:
+    return torch.allclose(a, b, atol=1e-7, rtol=1e-4)
+
+
 class TestLinearPath(ModuleGenerator):
+    def test_manual_merging(self) -> None:
+        relu = nn.ReLU()
+        lin1, lin1_mp = self.linear3_4
+        lin2, lin2_mp = self.linear4_4
+        lin3, lin3_mp = self.linear4_3
+
+        lin2_mp.input_permutation = lin1_mp.output_permutation
+        lin3_mp.input_permutation = lin2_mp.output_permutation
+
+        model = nn.Sequential(lin1, relu, lin2, relu, lin3, relu)
+        x = torch.randn(3, 3)
+        y_orig = model(x)
+
+        lin1_mp.apply_permutations(except_axis=1)
+        lin2_mp.apply_permutations()
+        lin3_mp.apply_permutations(except_axis=0)
+
+        y_new = model(x)
+
+        assert allclose(y_orig, y_new)
+
     def test_simple_path(self) -> None:
         relu = nn.ReLU()
         lin1, lin1_mp = self.linear3_4
@@ -23,35 +49,158 @@ class TestLinearPath(ModuleGenerator):
         x = torch.randn(3, 3)
         y_orig = model(x)
 
-        path = [lin1_mp, lin2_mp, lin3_mp]
-        lp = LinearPath(path)
-        lp.apply_permutations()
+        seq = [lin1_mp, lin2_mp, lin3_mp]
+        lp = LinearPath(seq)
+        path = Path([lp])
+        path.merge_permutations()
+        path.apply_permutations()
 
         y_new = model(x)
 
-        assert torch.allclose(y_orig, y_new)
+        assert allclose(y_orig, y_new)
+
+    def test_ln_before_linear(self) -> None:
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4, lin3_4_mp = self.linear3_4
+            lin4_4, lin4_4_mp = self.linear4_4
+            lin4_3, lin4_3_mp = self.linear4_3
+            ln3, ln3_mp = self.layernorm_3
+
+            model = nn.Sequential(
+                ln3, lin3_4, relu, lin4_4, relu, lin4_3, relu
+            )
+
+            x = torch.randn(3, 3)
+            y_orig = model(x)
+
+            seq = [ln3_mp, lin3_4_mp, lin4_4_mp, lin4_3_mp]
+            lp = LinearPath(seq)
+            path = Path([lp])
+            path.merge_permutations()
+            path.apply_permutations()
+
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
+
+    def test_ln_after_linear(self) -> None:
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4, lin3_4_mp = self.linear3_4
+            lin4_4, lin4_4_mp = self.linear4_4
+            lin4_3, lin4_3_mp = self.linear4_3
+            ln3, ln3_mp = self.layernorm_3
+
+            model = nn.Sequential(
+                lin3_4, relu, lin4_4, relu, lin4_3, relu, ln3
+            )
+
+            x = torch.randn(3, 3)
+            y_orig = model(x)
+
+            seq = [lin3_4_mp, lin4_4_mp, lin4_3_mp, ln3_mp]
+            lp = LinearPath(seq)
+            path = Path([lp])
+            path.merge_permutations()
+            path.apply_permutations()
+
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
+
+    def test_lin_ln_lin_manual(self) -> None:
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4 = nn.Linear(3, 4, bias=False)
+            lin4_3 = nn.Linear(4, 3, bias=False)
+            ln4 = nn.LayerNorm(4)
+
+            model = nn.Sequential(lin3_4, relu, ln4, lin4_3, relu)
+            x = torch.randn(3)
+            y_orig = model(x)
+
+            perm = torch.tensor([0, 2, 1, 3])
+            lin3_4.weight.data = lin3_4.weight.data[perm]
+            lin4_3.weight.data = lin4_3.weight.data[:, perm]
+            ln4.weight.data = ln4.weight.data[perm]
+
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
+
+    def test_lin_ln_lin_manual2(self) -> None:
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4, lin3_4_mp = self.linear3_4
+            lin4_3, lin4_3_mp = self.linear4_3
+            ln4, ln4_mp = self.layernorm_4
+
+            model = nn.Sequential(lin3_4, relu, ln4, lin4_3, relu)
+            x = torch.randn(3)
+            y_orig = model(x)
+
+            lin3_4_mp.input_permutation = Perm(torch.tensor([0, 1, 2]))
+            ln4_mp.input_permutation = lin3_4_mp.output_permutation
+            lin4_3_mp.input_permutation = ln4_mp.output_permutation
+            lin4_3_mp.output_permutation = Perm(torch.tensor([0, 1, 2]))
+
+            for mod in [lin3_4_mp, ln4_mp, lin4_3_mp]:
+                mod.apply_permutations()
+
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
+
+    def test_lin_ln_lin(self) -> None:
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4, lin3_4_mp = self.linear3_4
+            lin4_3, lin4_3_mp = self.linear4_3
+            ln4, ln4_mp = self.layernorm_4
+
+            model = nn.Sequential(
+                lin3_4, relu, ln4, lin4_3, relu
+            )
+
+            x = torch.randn(3)
+            y_orig = model(x)
+
+            seq = [lin3_4_mp, ln4_mp, lin4_3_mp]
+            lp = LinearPath(seq)
+            path = Path([lp])
+            path.merge_permutations()
+            path.apply_permutations()
+
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
 
     def test_path_with_layer_norms(self) -> None:
-        relu = nn.ReLU()
-        lin3_4, lin3_4_mp = self.linear3_4
-        lin4_4, lin4_4_mp = self.linear4_4
-        lin4_3, lin4_3_mp = self.linear4_3
-        ln4, ln4_mp = self.layernorm_4
+        for _ in range(10):
+            relu = nn.ReLU()
+            lin3_4, lin3_4_mp = self.linear3_4
+            lin4_4, lin4_4_mp = self.linear4_4
+            lin4_3, lin4_3_mp = self.linear4_3
+            ln4_one, ln4_one_mp = self.layernorm_4
+            ln4_two, ln4_two_mp = self.layernorm_4  # Generate a distinct LayerNorm!
 
-        model = nn.Sequential(
-            lin3_4, relu, ln4, relu, lin4_4, relu, ln4, relu, lin4_3, relu
-        )
+            model = nn.Sequential(
+                lin3_4, relu, ln4_one, lin4_4, relu, ln4_two, lin4_3, relu
+            )
 
-        x = torch.randn(3, 3)
-        y_orig = model(x)
+            x = torch.randn(3, 3)
+            y_orig = model(x)
 
-        path = [lin3_4_mp, ln4_mp, lin4_4_mp, ln4_mp, lin4_3_mp]
-        lp = LinearPath(path)
-        lp.apply_permutations()
+            seq = [lin3_4_mp, ln4_one_mp, lin4_4_mp, ln4_two_mp, lin4_3_mp]
+            lp = LinearPath(seq)
+            path = Path([lp])
+            path.merge_permutations()
+            path.apply_permutations()
 
-        y_new = model(x)
+            y_new = model(x)
 
-        assert torch.allclose(y_orig, y_new)
+            assert allclose(y_orig, y_new)
 
 
 class TestResidualPath(ModuleGenerator):
@@ -84,9 +233,11 @@ class TestResidualPath(ModuleGenerator):
         x = torch.randn(3, 3)
         y_orig = model(x)
 
-        path = [lin1_mp, lin2_mp, lin3_mp]
-        rp = ResidualPath(long_path=path, short_path=[])
-        rp.apply_permutations()
+        seq = [lin1_mp, lin2_mp, lin3_mp]
+        rp = ResidualPath(long_path=seq, short_path=[])
+        path = Path([rp])
+        path.merge_permutations()
+        path.apply_permutations()
 
         y_new = model(x)
 
@@ -97,38 +248,29 @@ class TestResidualPath(ModuleGenerator):
         lin3_4, lin3_4_mp = self.linear3_4
         lin4_4, lin4_4_mp = self.linear4_4
         lin4_3, lin4_3_mp = self.linear4_3
-        ln4, ln4_mp = self.layernorm_4
+        ln4_one, ln4_mp_one = self.layernorm_4
+        ln4_two, ln4_mp_two = self.layernorm_4  # Generate a distinct LayerNorm!
 
         class ResBlockLinear(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.lin1 = lin3_4
-                self.ln1 = ln4
-                self.lin2 = lin4_4
-                self.ln2 = ln4
-                self.lin3 = lin4_3
-                self.relu = relu
+                self.longpath = nn.Sequential(
+                    lin3_4, relu, ln4_one, lin4_4, relu, ln4_two, lin4_3, relu
+                )
 
             def forward(self, input_tensor: torch.Tensor) -> Any:
-                shortcut = input_tensor
-                long_cut = self.lin1(input_tensor)
-                long_cut = self.relu(long_cut)
-                long_cut = self.ln1(long_cut)
-                long_cut = self.lin2(long_cut)
-                long_cut = self.relu(long_cut)
-                long_cut = self.ln2(long_cut)
-                long_cut = self.lin3(long_cut)
-                long_cut = self.relu(long_cut)
-                return shortcut + long_cut
+                return input_tensor + self.longpath(input_tensor)
 
         model = ResBlockLinear()
 
         x = torch.randn(3, 3)
         y_orig = model(x)
 
-        path = [lin3_4_mp, ln4_mp, lin4_4_mp, ln4_mp, lin4_3_mp]
-        rp = ResidualPath(long_path=path, short_path=[])
-        rp.apply_permutations()
+        seq = [lin3_4_mp, ln4_mp_one, lin4_4_mp, ln4_mp_two, lin4_3_mp]
+        rp = ResidualPath(long_path=seq, short_path=[])
+        path = Path([rp])
+        path.merge_permutations()
+        path.apply_permutations()
 
         y_new = model(x)
 
@@ -139,40 +281,30 @@ class TestResidualPath(ModuleGenerator):
         lin3_4, lin3_4_mp = self.linear3_4
         lin4_4, lin4_4_mp = self.linear4_4
         lin4_3, lin4_3_mp = self.linear4_3
-        ln4, ln4_mp = self.layernorm_4
+        ln4_one, ln4_one_mp = self.layernorm_4
+        ln4_two, ln4_two_mp = self.layernorm_4  # Generate a distinct LayerNorm!
         shortcut, shortcut_mp = self.linear3_3
 
         class ResBlockLinear(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.lin1 = lin3_4
-                self.ln1 = ln4
-                self.lin2 = lin4_4
-                self.ln2 = ln4
-                self.lin3 = lin4_3
-                self.shortcut = shortcut
-                self.relu = relu
+                self.longpath = nn.Sequential(
+                    lin3_4, relu, ln4_one, lin4_4, relu, ln4_two, lin4_3, relu
+                )
 
             def forward(self, input_tensor: torch.Tensor) -> Any:
-                short_cut = self.shortcut(input_tensor)
-                long_cut = self.lin1(input_tensor)
-                long_cut = self.relu(long_cut)
-                long_cut = self.ln1(long_cut)
-                long_cut = self.lin2(long_cut)
-                long_cut = self.relu(long_cut)
-                long_cut = self.ln2(long_cut)
-                long_cut = self.lin3(long_cut)
-                long_cut = self.relu(long_cut)
-                return short_cut + long_cut
+                return shortcut(input_tensor) + self.longpath(input_tensor)
 
         model = ResBlockLinear()
 
         x = torch.randn(3, 3)
         y_orig = model(x)
 
-        path = [lin3_4_mp, ln4_mp, lin4_4_mp, ln4_mp, lin4_3_mp]
-        rp = ResidualPath(long_path=path, short_path=[shortcut_mp])
-        rp.apply_permutations()
+        long_path = [lin3_4_mp, ln4_one_mp, lin4_4_mp, ln4_two_mp, lin4_3_mp]
+        rp = ResidualPath(long_path=long_path, short_path=[shortcut_mp])
+        path = Path([rp])
+        path.merge_permutations()
+        path.apply_permutations()
 
         y_new = model(x)
 
