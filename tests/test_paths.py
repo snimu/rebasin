@@ -309,3 +309,154 @@ class TestResidualPath(ModuleGenerator):
         y_new = model(x)
 
         assert torch.allclose(y_orig, y_new)
+
+
+class TestCombinedPaths(ModuleGenerator):
+    @property
+    def linear_path_simple(self) -> tuple[nn.Module, LinearPath]:
+        relu = nn.ReLU()
+        lin1, lin1_mp = self.linear3_4
+        lin2, lin2_mp = self.linear4_4
+        lin3, lin3_mp = self.linear4_3
+        model = nn.Sequential(lin1, relu, lin2, relu, lin3, relu)
+        return model, LinearPath([lin1_mp, lin2_mp, lin3_mp])
+
+    @property
+    def linear_path_with_norms(self) -> tuple[nn.Module, LinearPath]:
+        relu = nn.ReLU()
+        lin1, lin1_mp = self.linear3_4
+        lin2, lin2_mp = self.linear4_4
+        lin3, lin3_mp = self.linear4_3
+        ln1, ln1_mp = self.layernorm_4
+        ln2, ln2_mp = self.layernorm_4
+        model = nn.Sequential(lin1, relu, ln1, lin2, relu, ln2, lin3, relu)
+        return model, LinearPath([lin1_mp, ln1_mp, lin2_mp, ln2_mp, lin3_mp])
+
+    @property
+    def residual_path_simple(self) -> tuple[nn.Module, ResidualPath]:
+        relu = nn.ReLU()
+        lin3_4, lin3_4_mp = self.linear3_4
+        lin4_4, lin4_4_mp = self.linear4_4
+        lin4_3, lin4_3_mp = self.linear4_3
+        ln4_one, ln4_mp_one = self.layernorm_4
+        ln4_two, ln4_mp_two = self.layernorm_4  # Generate a distinct LayerNorm!
+
+        class ResBlockLinear(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.longpath = nn.Sequential(
+                    lin3_4, relu, ln4_one, lin4_4, relu, ln4_two, lin4_3, relu
+                )
+
+            def forward(self, input_tensor: torch.Tensor) -> Any:
+                return input_tensor + self.longpath(input_tensor)
+
+        seq = [lin3_4_mp, ln4_mp_one, lin4_4_mp, ln4_mp_two, lin4_3_mp]
+        rp = ResidualPath(long_path=seq, short_path=[])
+        return ResBlockLinear(), rp
+
+    @property
+    def residual_path_with_shortcut(self) -> tuple[nn.Module, ResidualPath]:
+        relu = nn.ReLU()
+        lin3_4, lin3_4_mp = self.linear3_4
+        lin4_4, lin4_4_mp = self.linear4_4
+        lin4_3, lin4_3_mp = self.linear4_3
+        ln4_one, ln4_one_mp = self.layernorm_4
+        ln4_two, ln4_two_mp = self.layernorm_4
+
+        shortcut, shortcut_mp = self.linear3_3
+
+        class ResBlockLinear(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.longpath = nn.Sequential(
+                    lin3_4, relu, ln4_one, lin4_4, relu, ln4_two, lin4_3, relu
+                )
+
+            def forward(self, input_tensor: torch.Tensor) -> Any:
+                return shortcut(input_tensor) + self.longpath(input_tensor)
+
+        seq = [lin3_4_mp, ln4_one_mp, lin4_4_mp, ln4_two_mp, lin4_3_mp]
+        rp = ResidualPath(long_path=seq, short_path=[shortcut_mp])
+        return ResBlockLinear(), rp
+
+    def test_linear(self) -> None:
+        model_lin_simple, linear_path_simple = self.linear_path_simple
+        model_lin_norm, linear_path_norm = self.linear_path_with_norms
+
+        model = nn.Sequential(model_lin_simple, model_lin_norm)
+
+        x = torch.randn(3, 3)
+        y_orig = model(x)
+
+        path = Path([linear_path_simple, linear_path_norm])
+
+        path.merge_permutations()
+        path.apply_permutations()
+
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new)
+
+    def test_residual(self) -> None:
+        model_res_simple, residual_path_simple = self.residual_path_simple
+        model_res_shortcut, residual_path_shortcut = self.residual_path_with_shortcut
+
+        model = nn.Sequential(model_res_simple, model_res_shortcut)
+        x = torch.randn(3, 3)
+        y_orig = model(x)
+
+        path = Path([residual_path_simple, residual_path_shortcut])
+        path.merge_permutations()
+        path.apply_permutations()
+
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new)
+
+    def test_simple(self) -> None:
+        model_lin, path_lin = self.linear_path_simple
+        model_res, path_res = self.residual_path_simple
+
+        model = nn.Sequential(model_lin, model_res)
+        x = torch.randn(3, 3)
+        y_orig = model(x)
+
+        path = Path([path_lin, path_res])
+        path.merge_permutations()
+        path.apply_permutations()
+
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new)
+
+    def test_all(self) -> None:
+        model_lin_simple, linear_path_simple = self.linear_path_simple
+        model_lin_norm, linear_path_norm = self.linear_path_with_norms
+        model_res_simple, residual_path_simple = self.residual_path_simple
+        model_res_shortcut, residual_path_shortcut = self.residual_path_with_shortcut
+
+        model = nn.Sequential(
+            model_lin_simple,
+            model_lin_norm,
+            model_res_simple,
+            model_res_shortcut,
+        )
+        x = torch.randn(3, 3)
+        y_orig = model(x)
+
+        path = Path(
+            [
+                linear_path_simple,
+                linear_path_norm,
+                residual_path_simple,
+                residual_path_shortcut,
+            ]
+        )
+
+        path.merge_permutations()
+        path.apply_permutations()
+
+        y_new = model(x)
+
+        assert torch.allclose(y_orig, y_new)

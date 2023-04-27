@@ -82,34 +82,10 @@ class Path:
         if not self.path:
             return
 
-        self._make_input_identity(self.path[0])
-
-        if len(self.path) == 1:
-            path = self.path[0]
+        for path in self.path:
+            self._make_input_identity(path)
             path.merge_internal()
-        else:
-            for path0, path1 in itertools.pairwise(self.path):
-                self._connect_paths(path0, path1)
-                path0.merge_internal()
-                path1.merge_internal()
-
-        self._make_output_identity(self.path[-1])
-
-    @staticmethod
-    def _connect_paths(
-            path0: LinearPath | ResidualPath, path1: LinearPath | ResidualPath
-    ) -> None:
-        out_perm0 = (
-            path0.path[-1].output_permutation
-            if isinstance(path0, LinearPath)
-            else path0.long_path[-1].output_permutation
-        )
-        if isinstance(path1, LinearPath):
-            path1.path[0].input_permutation = out_perm0
-        else:
-            path1.long_path[0].input_permutation = out_perm0
-            if path1.short_path:
-                path1.short_path[0].input_permutation = out_perm0
+            self._make_output_identity(path)
 
     def _make_input_identity(self, path: LinearPath | ResidualPath) -> None:
         if isinstance(path, LinearPath):
