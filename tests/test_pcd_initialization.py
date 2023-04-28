@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import copy
 
-import pytest
 import torch
 from torch import nn
 from torchvision.models import resnet50  # type: ignore[import]
