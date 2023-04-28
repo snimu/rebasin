@@ -45,11 +45,11 @@ class PermutationInitialization:
         self._get_permutations()
 
     def _trace_path(self) -> ModelPaths:
-        root_a = set(
+        root_a = list(
             draw_graph(self.model_a, input_data=self.input_data, depth=1e12)
             .root_container
         )
-        root_b = set(
+        root_b = list(
             draw_graph(self.model_b, input_data=self.input_data, depth=1e12)
             .root_container
         )
@@ -60,16 +60,16 @@ class PermutationInitialization:
             )
 
         visited_nodes: set[NODE_TYPES] = set()
-        working_nodes_a: set[NODE_TYPES] = root_a  # type: ignore[assignment]
-        working_nodes_b: set[NODE_TYPES] = root_b  # type: ignore[assignment]
+        working_nodes_a: list[NODE_TYPES] = root_a  # type: ignore[assignment]
+        working_nodes_b: list[NODE_TYPES] = root_b  # type: ignore[assignment]
         paths: list[list[ModuleParameters]] = []
 
         while working_nodes_a and working_nodes_b:
             assert len(working_nodes_a) == len(working_nodes_b), \
                 "Both models must have the same architecture!"
 
-            new_working_nodes_a: set[NODE_TYPES] = set()
-            new_working_nodes_b: set[NODE_TYPES] = set()
+            new_working_nodes_a: list[NODE_TYPES] = []
+            new_working_nodes_b: list[NODE_TYPES] = []
 
             for node_a, node_b in zip(working_nodes_a, working_nodes_b):  # noqa: B905
                 if node_a in visited_nodes or node_b in visited_nodes:
@@ -78,8 +78,8 @@ class PermutationInitialization:
                     node_a, node_b
                 )
                 paths.append(path)
-                new_working_nodes_a.update(children_a)
-                new_working_nodes_b.update(children_b)
+                new_working_nodes_a.extend(children_a)
+                new_working_nodes_b.extend(children_b)
                 visited_nodes.update(visited)
 
             working_nodes_a = new_working_nodes_a
@@ -93,8 +93,8 @@ class PermutationInitialization:
             node_b: NODE_TYPES
     ) -> tuple[
         list[ModuleParameters],
-        set[NODE_TYPES],
-        set[NODE_TYPES],
+        list[NODE_TYPES],
+        list[NODE_TYPES],
         set[NODE_TYPES]
     ]:
         # Steps:
@@ -122,8 +122,8 @@ class PermutationInitialization:
             node_a = tuple(node_a.children)[0]  # type: ignore[assignment]
             node_b = tuple(node_b.children)[0]  # type: ignore[assignment]
 
-        children_a: set[NODE_TYPES] = set(node_a.children)  # type: ignore[arg-type]
-        children_b: set[NODE_TYPES] = set(node_b.children)  # type: ignore[arg-type]
+        children_a: list[NODE_TYPES] = list(node_a.children)  # type: ignore[arg-type]
+        children_b: list[NODE_TYPES] = list(node_b.children)  # type: ignore[arg-type]
 
         return path, children_a, children_b, visited
 
@@ -134,7 +134,8 @@ class PermutationInitialization:
             node_b: NODE_TYPES
     ) -> None:
         assert type(node_a) == type(node_b), \
-            "Both models must have the same architecture!"
+            "Both models must have the same architecture! " \
+            f"But {type(node_a)=} and {type(node_b)=}"
 
         if not isinstance(node_a, ModuleNode) or not isinstance(node_b, ModuleNode):
             return
