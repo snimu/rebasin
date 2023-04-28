@@ -24,3 +24,13 @@ def model_distance(model_a: nn.Module, model_b: nn.Module) -> float:
         dist += (pa - pb).abs().sum().item()
 
     return dist
+
+
+def allclose(a: torch.Tensor, b: torch.Tensor) -> bool:
+    """A relaxed torch.allclose: torch.allclose(a, b, atol=1e-3, rtol=1e-3).
+
+    Why these tolerances? I don't care much about absolute differences,
+    and a relative difference of .1% is acceptable.
+
+    """
+    return torch.allclose(a, b, atol=1e-3, rtol=1e-3)

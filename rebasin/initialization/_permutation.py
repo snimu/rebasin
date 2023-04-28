@@ -5,6 +5,7 @@ The definition of a permutation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 from torch import nn
@@ -105,6 +106,7 @@ class ModuleParameters:
     weight_b: nn.Parameter | torch.Tensor
     name: str
     axis_to_permutation: dict[int, Perm]
+    module_type: Any
 
     # A parameter is either only a weight, or a weight with associated bias.
     # This is because the weights are used for associating permutations.
@@ -132,7 +134,10 @@ class ModuleParameters:
 
     @output_permutation.setter
     def output_permutation(self, perm: Perm) -> None:
-        self.axis_to_permutation[0] = perm
+        if self.module_type is nn.LayerNorm and len(self.axis_to_permutation) > 1:
+            self.axis_to_permutation[0] = Perm(torch.arange(len(perm)))
+        else:
+            self.axis_to_permutation[0] = perm
 
     def apply_permutations(self, except_axis: int = -1) -> None:
         for axis, permutation in self.axis_to_permutation.items():

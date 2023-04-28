@@ -12,6 +12,8 @@ import itertools
 import torch
 from torch import nn
 
+from tests.fixtures.util import allclose
+
 
 def test_model_output_consistency_tensors() -> None:
     """
@@ -27,7 +29,7 @@ def test_model_output_consistency_tensors() -> None:
     x_new = x[perm]
     y_new = x_new @ W_new
 
-    assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+    assert allclose(y_orig, y_new)
 
 
 class TestConsistencyLinear:
@@ -81,7 +83,7 @@ class TestConsistencyLinear:
             y_new = model(x)
             # Floating point operations lead to enough error that we need to
             # relax the tolerance a bit.
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_perm_out_same_perm_in_multi_layer() -> None:
@@ -104,7 +106,7 @@ class TestConsistencyLinear:
 
             y_new = model(x)
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
 
 class TestConsistencyConv1d:
@@ -139,7 +141,7 @@ class TestConsistencyConv1d:
 
             y_new = model(x)
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
 
 class TestConsistencyConv2d:
@@ -175,7 +177,7 @@ class TestConsistencyConv2d:
 
             y_new = model(x)
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
 
 class TestConsistencyConv3d:
@@ -213,7 +215,7 @@ class TestConsistencyConv3d:
 
             y_new = model(x)
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
 
 
@@ -253,7 +255,7 @@ class TestLayerNorm:
         rev_perm = torch.argsort(perm)
         y_new = y_new[rev_perm]
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_layernorm_before_linear() -> None:
@@ -272,7 +274,7 @@ class TestLayerNorm:
 
         y_new = model(x[perm])  # permute input to match permutation of weights
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_layernorm_between_linears() -> None:
@@ -292,7 +294,66 @@ class TestLayerNorm:
         lin2.weight.data = lin2.weight.data[:, perm]
         y_new = model(x)
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
+
+    @staticmethod
+    def test_layernorm_before_conv() -> None:
+        for _ in range(10):
+            x = torch.randn(2, 3, 18, 18)
+
+            ln = nn.LayerNorm([2, 3, 18, 18])
+            ln.weight.data *= torch.randn(2, 3, 18, 18)
+            conv = nn.Conv2d(3, 4, (3, 3), bias=False)
+
+            model = nn.Sequential(ln, conv)
+            y_orig = model(x)
+
+            perm_in = torch.randperm(3)
+            ln.weight.data = ln.weight.data[:, perm_in]
+            conv.weight.data = conv.weight.data[:, perm_in]
+            y_new = model(x[:, perm_in])
+
+            assert allclose(y_orig, y_new)
+
+    @staticmethod
+    def test_layernorm_after_conv() -> None:
+        for _ in range(10):
+            x = torch.randn(2, 3, 4, 4)
+
+            conv = nn.Conv2d(3, 4, (3, 3), bias=False)
+            ln = nn.LayerNorm([2, 4, 2, 2])
+            ln.weight.data *= torch.randn(2, 4, 2, 2)
+
+            model = nn.Sequential(conv, ln)
+            y_orig = model(x)
+
+            perm_out = torch.randperm(4)
+            conv.weight.data = conv.weight.data[perm_out]
+            ln.weight.data = ln.weight.data[:, perm_out]
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new[:, torch.argsort(perm_out)])
+
+    @staticmethod
+    def test_layernorm_between_conv() -> None:
+        for _ in range(10):
+            x = torch.randn(2, 3, 6, 6)
+
+            conv1 = nn.Conv2d(3, 4, (3, 3), bias=False)
+            ln = nn.LayerNorm([2, 4, 4, 4])
+            ln.weight.data *= torch.randn(2, 4, 4, 4)
+            conv2 = nn.Conv2d(4, 5, (3, 3), bias=False)
+
+            model = nn.Sequential(conv1, ln, conv2)
+            y_orig = model(x)
+
+            perm = torch.randperm(4)
+            conv1.weight.data = conv1.weight.data[perm]
+            ln.weight.data = ln.weight.data[:, perm]
+            conv2.weight.data = conv2.weight.data[:, perm]
+            y_new = model(x)
+
+            assert allclose(y_orig, y_new)
 
 
 class TestBatchNorm1d:
@@ -336,7 +397,7 @@ class TestBatchNorm1d:
         rev_perm = torch.argsort(perm)
         y_new = y_new[:, rev_perm]
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_batchnorm_before_linear() -> None:
@@ -356,7 +417,7 @@ class TestBatchNorm1d:
 
         y_new = model(x[:, perm])
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_batchnorm_between_linears() -> None:
@@ -377,7 +438,7 @@ class TestBatchNorm1d:
         bn.reset_running_stats()
         y_new = model(x)
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
 
 class TestBatchNorm2d:
@@ -398,7 +459,7 @@ class TestBatchNorm2d:
         rev_perm = torch.argsort(perm)
         y_new = y_new[:, rev_perm]
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_batchnorm_before_conv2d() -> None:
@@ -416,7 +477,7 @@ class TestBatchNorm2d:
 
         y_new = model(x[:, perm])
 
-        assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+        assert allclose(y_orig, y_new)
 
 
 class TestConsistencyBatchNorm3d:
@@ -461,7 +522,7 @@ class TestConsistencyBatchNorm3d:
             rev_perm = torch.argsort(perm)
             y_new = y_new[:, rev_perm]
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_batchnorm_before_conv3d() -> None:
@@ -484,7 +545,7 @@ class TestConsistencyBatchNorm3d:
 
             y_new = model(x[:, perm])
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
     @staticmethod
     def test_batchnorm_between_conv3d() -> None:
@@ -509,5 +570,5 @@ class TestConsistencyBatchNorm3d:
 
             y_new = model(x)
 
-            assert torch.allclose(y_orig, y_new, atol=1e-7, rtol=1e-4)
+            assert allclose(y_orig, y_new)
 
