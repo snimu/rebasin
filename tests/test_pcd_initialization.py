@@ -12,7 +12,7 @@ from torchvision.models import resnet50  # type: ignore[import]
 
 from rebasin.initialization.initializer import PermutationInitialization
 from tests.fixtures.models import MLP
-from tests.fixtures.util import allclose, model_change_percent, path_analysis
+from tests.fixtures.util import allclose, model_change_percent
 
 
 def randomize_permutations(initializer: PermutationInitialization) -> None:
