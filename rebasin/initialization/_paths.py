@@ -95,8 +95,14 @@ class ModelPaths:
         identity = Perm(torch.arange(len(path[out_pt].output_permutation)))
         path[out_pt].output_permutation = identity
 
-        # Handle LayerNorm outputs
-        while path[out_pt].module_type is nn.LayerNorm and -out_pt <= len(path):
+        # Handle LayerNorm as well as 1d outputs
+        while (
+                (
+                        path[out_pt].module_type is nn.LayerNorm
+                        or len(path[out_pt].axis_to_permutation) == 1
+                )
+                and -out_pt <= len(path)
+        ):
             out_pt -= 1
             identity = Perm(torch.arange(len(path[out_pt + 1].input_permutation)))
             path[out_pt + 1].input_permutation = identity

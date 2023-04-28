@@ -52,9 +52,6 @@ def test_on_mlp() -> None:
     assert allclose(y_orig, y_new)
 
 
-@pytest.mark.skip(
-    reason="Currently doesn't pass, but yielded useful info, so I want to commit it."
-)
 def test_on_resnet50() -> None:
     """Test the :class:`PermutationInitialization` initializer on ResNet50."""
 

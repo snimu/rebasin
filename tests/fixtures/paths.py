@@ -57,6 +57,22 @@ class ModuleGenerator:
         return layer_norm, layer_norm_mp
 
     @staticmethod
+    def batchnorm2d(num_features: int) -> tuple[nn.BatchNorm2d, ModuleParameters]:
+        batch_norm = nn.BatchNorm2d(num_features)
+        batch_norm.weight.data *= torch.randn_like(batch_norm.weight.data)
+
+        batch_norm_mp = ModuleParameters(
+            weight_a=batch_norm.weight,
+            weight_b=batch_norm.weight,
+            name="batch_norm",
+            axis_to_permutation={0: Perm(torch.randperm(num_features))},
+            bias_a=batch_norm.bias,
+            bias_b=batch_norm.bias,
+            module_type=nn.BatchNorm2d,
+        )
+        return batch_norm, batch_norm_mp
+
+    @staticmethod
     def conv2d(
             in_channels: int,
             out_channels: int,
@@ -285,3 +301,33 @@ class ModuleGenerator:
         ]
         shortpath: list[ModuleParameters] = []
         return x, model, [longpath, shortpath]
+
+    def linear_path_with_batch_norm(
+            self
+    ) -> tuple[torch.Tensor, nn.Module, list[list[ModuleParameters]]]:
+        x = torch.randn(2, 3, 36, 36)
+
+        conv3_4, conv3_4_mp = self.conv2d(3, 4, (3, 3))
+        conv4_4, conv4_4_mp = self.conv2d(4, 4, (3, 3))
+        conv4_3, conv4_3_mp = self.conv2d(4, 3, (3, 3))
+
+        bn3, bn3_mp = self.batchnorm2d(3)
+        bn4, bn4_mp = self.batchnorm2d(4)
+        bn4_2, bn4_2_mp = self.batchnorm2d(4)
+        bn3_2, bn3_2_mp = self.batchnorm2d(3)
+
+        model = nn.Sequential(
+            bn3, conv3_4, self.relu,
+            bn4, conv4_4, self.relu,
+            bn4_2, conv4_3, self.relu,
+            bn3_2
+        )
+
+        path = [
+            bn3_mp, conv3_4_mp,
+            bn4_mp, conv4_4_mp,
+            bn4_2_mp, conv4_3_mp,
+            bn3_2_mp
+        ]
+
+        return x, model, [path]

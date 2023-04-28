@@ -151,3 +151,6 @@ class TestPaths(ModuleGenerator):
 
     def test_conv_residual_path_simple(self) -> None:
         self.path_test(self.residual_path_conv2d_simple)
+
+    def test_linear_path_with_batchnorm(self) -> None:
+        self.path_test(self.linear_path_with_batch_norm)
