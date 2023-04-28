@@ -11,16 +11,7 @@ from torch import nn
 from rebasin.initialization._paths import ModelPaths
 from rebasin.initialization._permutation import ModuleParameters
 from tests.fixtures.paths import ModuleGenerator
-from tests.fixtures.util import allclose
-
-
-def model_change_percent(model1: nn.Module, model2: nn.Module) -> float:
-    diff = 0.0
-    base = 0.0
-    for p1, p2 in zip(model1.parameters(), model2.parameters()):  # noqa: B905
-        diff += torch.sum(torch.abs(p1 - p2)).item()
-        base += torch.sum(torch.abs(p2)).item()
-    return diff / base
+from tests.fixtures.util import allclose, model_change_percent
 
 
 class TestPaths(ModuleGenerator):
@@ -35,7 +26,6 @@ class TestPaths(ModuleGenerator):
             y_orig = model(x)
 
             path = ModelPaths(seq)
-            path.merge_permutations()
             path.apply_permutations()
 
             # Check that the model has changed
@@ -57,7 +47,6 @@ class TestPaths(ModuleGenerator):
             y_orig = model(x)
 
             path = ModelPaths(paths)
-            path.merge_permutations()
             path.apply_permutations()
 
             # Check that the model has changed
@@ -79,7 +68,6 @@ class TestPaths(ModuleGenerator):
             y_orig = model(x)
 
             path = ModelPaths(paths)
-            path.merge_permutations()
             path.apply_permutations()
 
             # Check that the model has changed
@@ -105,7 +93,6 @@ class TestPaths(ModuleGenerator):
             y_orig = model(x)
 
             path = ModelPaths(paths_res_one + paths_lin + paths_res_two)
-            path.merge_permutations()
             path.apply_permutations()
 
             # Check that the model has changed
@@ -132,7 +119,6 @@ class TestPaths(ModuleGenerator):
             y_orig = model(x)
 
             path = ModelPaths(paths)
-            path.merge_permutations()
             path.apply_permutations()
 
             permstr = "\n".join(

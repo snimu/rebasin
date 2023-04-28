@@ -44,6 +44,13 @@ class ModelPaths:
         self.paths = paths
 
     def apply_permutations(self) -> None:
+        # Make sure that the constraints on the permutations are applied:
+        #  1. They are merged
+        #  2. They change the model in such a way
+        #       that it produces the same output as before
+        self.merge_permutations()
+
+        # Apply the permutations to the model
         for path in self.paths:
             for mod in path:
                 mod.apply_permutations()
