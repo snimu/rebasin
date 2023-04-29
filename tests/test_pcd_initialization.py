@@ -32,32 +32,16 @@ def reset_running_stats(model: nn.Module) -> None:
 
 def test_on_mlp() -> None:
     """Test the :class:`PermutationInitialization` initializer on an MLP."""
-
-    model_a = MLP(25, 10)
-    model_b = MLP(25, 10)
-    model_b_orig = copy.deepcopy(model_b)
-    x = torch.randn(25)
-    y_orig = model_b(x)
-
-    initializer = PermutationInitialization(model_a, model_b, x)
-
-    assert len(initializer.paths.paths) == 1
-
-    randomize_permutations(initializer)
-    initializer.paths.apply_permutations()
-    assert model_change_percent(model_b, model_b_orig) > 0.1
-
-    y_new = model_b(x)
-    assert allclose(y_orig, y_new)
+    common_tests(MLP(25, 10), MLP(25, 10), torch.randn(25))
 
 
 def test_on_resnet50() -> None:
     """Test the :class:`PermutationInitialization` initializer on ResNet50."""
+    common_tests(resnet50(), resnet50(), torch.randn(1, 3, 224, 224))
 
-    model_a = resnet50()
-    model_b = resnet50()
+
+def common_tests(model_a: nn.Module, model_b: nn.Module, x: torch.Tensor) -> None:
     model_b_orig = copy.deepcopy(model_b)
-    x = torch.randn(1, 3, 224, 224)
     reset_running_stats(model_b)
     y_orig = model_b(x)
 
