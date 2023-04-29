@@ -23,7 +23,13 @@ class PermInfo(NamedTuple):
 
 
 class PermutationInitialization:
-    def __init__(self, model_a: nn.Module, model_b: nn.Module, input_data: Any) -> None:
+    def __init__(
+            self,
+            model_a: nn.Module,
+            model_b: nn.Module,
+            input_data_b: Any,
+            input_data_a: Any | None = None
+    ) -> None:
         self.model_a = model_a
         self.model_b = model_b
         self._id_to_module_a: dict[int, nn.Module] = {
@@ -33,7 +39,8 @@ class PermutationInitialization:
             id(m): m for m in model_b.modules()
         }
 
-        self.input_data = input_data
+        self.input_data_b = input_data_b
+        self.input_data_a = input_data_a if input_data_a is not None else input_data_b
         self.paths = self._trace_path()
         self.paths.merge_permutations()
 
@@ -46,11 +53,11 @@ class PermutationInitialization:
 
     def _trace_path(self) -> ModelPaths:
         root_a = list(
-            draw_graph(self.model_a, input_data=self.input_data, depth=1e12)
+            draw_graph(self.model_a, input_data=self.input_data_a, depth=1e12)
             .root_container
         )
         root_b = list(
-            draw_graph(self.model_b, input_data=self.input_data, depth=1e12)
+            draw_graph(self.model_b, input_data=self.input_data_b, depth=1e12)
             .root_container
         )
 
