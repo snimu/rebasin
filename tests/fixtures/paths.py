@@ -5,7 +5,7 @@ from typing import Any
 import torch
 from torch import nn
 
-from rebasin.initialization._permutation import ModuleParameters, Perm
+from rebasin.initialization._permutation import ModuleParameters, Permutation
 
 
 class ModuleGenerator:
@@ -22,8 +22,8 @@ class ModuleGenerator:
             weight_b=linear.weight,
             name="linear",
             axis_to_permutation={
-                0: Perm(torch.randperm(out_channels)),
-                1: Perm(torch.randperm(in_channels))
+                0: Permutation(torch.randperm(out_channels)),
+                1: Permutation(torch.randperm(in_channels))
             },
             bias_a=bias_,
             bias_b=bias_,
@@ -39,12 +39,12 @@ class ModuleGenerator:
         layer_norm.weight.data *= torch.randn_like(layer_norm.weight.data)
 
         if isinstance(shape, int):
-            axis_to_perm = {0: Perm(torch.randperm(shape))}
+            axis_to_perm = {0: Permutation(torch.randperm(shape))}
         else:
             assert len(shape) > 1, "Shape must be an int or a tuple of length > 1"
             axis_to_perm = {
-                0: Perm(torch.randperm(shape[0])),
-                1: Perm(torch.randperm(shape[1]))
+                0: Permutation(torch.randperm(shape[0])),
+                1: Permutation(torch.randperm(shape[1]))
             }
 
         layer_norm_mp = ModuleParameters(
@@ -65,7 +65,7 @@ class ModuleGenerator:
             weight_a=batch_norm.weight,
             weight_b=batch_norm.weight,
             name="batch_norm",
-            axis_to_permutation={0: Perm(torch.randperm(num_features))},
+            axis_to_permutation={0: Permutation(torch.randperm(num_features))},
             bias_a=batch_norm.bias,
             bias_b=batch_norm.bias,
             module_type=nn.BatchNorm2d,
@@ -91,8 +91,8 @@ class ModuleGenerator:
             weight_b=conv2d.weight,
             name="conv2d",
             axis_to_permutation={
-                0: Perm(torch.randperm(out_channels)),
-                1: Perm(torch.randperm(in_channels))
+                0: Permutation(torch.randperm(out_channels)),
+                1: Permutation(torch.randperm(in_channels))
             },
             bias_a=bias_,
             bias_b=bias_,

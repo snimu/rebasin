@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import torch
 from torch import nn
 
-from rebasin.initialization._permutation import ModuleParameters, Perm
+from rebasin.initialization._permutation import ModuleParameters, Permutation
 
 
 def merge_linear_path(path: Sequence[ModuleParameters]) -> None:
@@ -72,7 +72,7 @@ class ModelPaths:
         permutation. Therefore, we need to make
         """
         in_pt = 0  # The input permutation pointer
-        identity = Perm(torch.arange(len(path[in_pt].input_permutation)))
+        identity = Permutation(torch.arange(len(path[in_pt].input_permutation)))
         path[in_pt].input_permutation = identity
 
         # Handle multi-dim LayerNorm inputs
@@ -92,7 +92,7 @@ class ModelPaths:
         permutation. Therefore, we need to make
         """
         out_pt = -1  # The output permutation pointer
-        identity = Perm(torch.arange(len(path[out_pt].output_permutation)))
+        identity = Permutation(torch.arange(len(path[out_pt].output_permutation)))
         path[out_pt].output_permutation = identity
 
         # Handle LayerNorm as well as 1d outputs
@@ -104,6 +104,8 @@ class ModelPaths:
                 and -out_pt <= len(path)
         ):
             out_pt -= 1
-            identity = Perm(torch.arange(len(path[out_pt + 1].input_permutation)))
+            identity = Permutation(
+                torch.arange(len(path[out_pt + 1].input_permutation))
+            )
             path[out_pt + 1].input_permutation = identity
             path[out_pt].output_permutation = path[out_pt + 1].input_permutation

@@ -17,9 +17,7 @@ from tests.fixtures.util import allclose, model_change_percent
 
 def randomize_permutations(initializer: PermutationInitialization) -> None:
     """Randomize the permutations in the initializer."""
-    for _, perm_info in initializer.permutations.items():
-        axis, mod_params = perm_info[0]
-        permutation = mod_params.axis_to_permutation[axis]
+    for permutation, _ in initializer.perm_to_info:
         permutation.perm_indices = torch.randperm(len(permutation.perm_indices))
 
 
