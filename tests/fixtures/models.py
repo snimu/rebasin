@@ -10,7 +10,7 @@ class MLP(nn.Module):
     """A Multi-Layer-Perceptron."""
 
     def __init__(
-            self, in_features: int, out_features: int = -1, num_layers: int = 5
+            self, in_features: int, num_layers: int = 5
     ) -> None:
         super().__init__()
 
@@ -28,7 +28,6 @@ class MLP(nn.Module):
             )
 
         self.model = nn.Sequential(*layers)
-        self.out_features = out_features
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         out: torch.Tensor = self.model(inputs)
@@ -42,42 +41,6 @@ class SaveCallCount(nn.Module):
 
     def forward(self, x: Any) -> Any:
         self.call_count += 1
-        return x
-
-
-class ModuleWithWeirdWeightAndBiasNames(nn.Module):
-    """
-    A model with weird weight and bias names.
-
-    Specifically, 'weight' and 'bias' appear in different positions
-    in their parameters' names.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.weightabc = nn.Parameter(torch.randn(15, 15))
-        self.defweightghi = nn.Parameter(torch.randn(15, 15))
-        self.jklweight = nn.Parameter(torch.randn(15, 15))
-
-        # Mix the order in bias names (except for one) to test that
-        #   the actual names are used, not the position of the words 'weight' and 'bias'
-        #   in those names.
-        self.abcbias = nn.Parameter(torch.randn(15))  # belongs to weightabc
-        self.defbiasghi = nn.Parameter(torch.randn(15))  # belongs to defweightghi
-        self.biasjkl = nn.Parameter(torch.randn(15))  # belongs to jklweight
-
-        # Create a weight and bias that don't fit to test that they are not associated.
-        self.xyzweight = nn.Parameter(torch.randn(15, 15))
-        self.xyzbias = nn.Parameter(torch.randn(3))
-
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        x: torch.Tensor = inputs @ self.weightabc + self.abcbias
-        x = nn.ReLU()(x)
-        x = x @ self.defweightghi + self.defbiasghi
-        x = nn.ReLU()(x)
-        x = x @ self.jklweight + self.biasjkl
-        x = nn.ReLU()(x)
-        x = x @ self.xyzweight + self.xyzbias.sum()
         return x
 
 

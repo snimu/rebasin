@@ -8,7 +8,8 @@ from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
-from rebasin._init_perms_weight_matching import PermutationInitializer
+from rebasin.initialization._permutation import ModuleParameters, Permutation
+from rebasin.initialization.initializer import PermutationInitialization
 
 
 def calculate_progress(
@@ -70,9 +71,19 @@ class PermutationCoordinateDescent:
             The target model.
         model_b:
             The model that will have its weights permuted.
-        input_data:
-            One batch of input data to trace the model's layout.
-            Assumed to be on :code:`device_b`.
+        input_data_b:
+            The input data to the model_b.
+            Used for tracing the model, so as long as the model can
+            call its forward pass with this data, it can be anything.
+            As this may be anything, this class cannot move it to any device.
+            Therefore, it is the user's responsibility to ensure that
+            :code:`input_data` is on the same device as :code:`model_b`.
+        input_data_a:
+            The input data to the model_a.
+            The same comments apply as to :code:`input_data_b`.
+            However, this argument is optional. If it is :code:`None`,
+            then :code:`input_data_b` will be used for both models.
+            Make sure that the device is correct in this case.
         device_a:
             The device on which :code:`model_a` is located.
             Both :code:`model_a` and :code:`model_b` must
@@ -90,7 +101,8 @@ class PermutationCoordinateDescent:
             self,
             model_a: nn.Module,
             model_b: nn.Module,
-            input_data: Any,
+            input_data_b: Any,
+            input_data_a: Any | None = None,
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
             verbose: bool = False
@@ -103,8 +115,9 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Initializing permutations...")
 
-        pinit = PermutationInitializer(model_a, model_b, input_data, verbose=verbose)
-        self.permutations = pinit.permutations
+        self.pinit = PermutationInitialization(
+            model_a, model_b, input_data_b, input_data_a
+        )
 
         if verbose:
             print("Done.")
@@ -121,14 +134,12 @@ class PermutationCoordinateDescent:
         if self.verbose:
             print("Calculating permutations...")
 
-        loop = tqdm(range(max_iterations), disable=not self.verbose)
-        for _i in loop:
+        for iteration in tqdm(range(max_iterations), disable=not self.verbose):
             progress = self._calculate_permutations_step()
             if not progress:
                 if self.verbose:
-                    print(f"Stopping early after {_i} steps.")
+                    print(f"Stopping early after {iteration + 1} steps.")
                 break
-            loop.refresh()
 
     def _calculate_permutations_step(self) -> bool:
         """
@@ -139,21 +150,42 @@ class PermutationCoordinateDescent:
         """
         progress = False
 
-        for i in torch.randperm(len(self.permutations)):
-            permutation = self.permutations[i]
-            n = len(permutation.perm_indices)
+        for i in torch.randperm(len(self.pinit.perm_to_info)):
+            # For mypy: give typehint
+            perm_and_info: tuple[
+                Permutation, list[tuple[int, ModuleParameters]]
+            ] = self.pinit.perm_to_info[i]
+
+            perm, perm_info = perm_and_info
+            n = len(perm.perm_indices)
             cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
-            for param_info in permutation.parameters:
-                axis = param_info.axis
+            for axis, module_parameters in perm_info:
                 # Copy so that the original parameter isn't moved to device_b.
                 # If this were not done, then in one of the later steps,
                 #   model_a would be almost completely on device_b.
                 # This is a problem because we want the models to be able to live
                 #   on different devices to allow for larger models
                 #   by splitting their memory needs.
-                w_a = copy.deepcopy(param_info.param_a).to(self.device_b)
-                w_b = copy.deepcopy(param_info.param_b).to(self.device_b)
+                # Also, we will apply some permutations, but don't want this
+                #   to affect the original parameter, because we might do this
+                #   again in another iteration.
+                params = copy.deepcopy(module_parameters)
+
+                # Apply all permutations except the one we are currently working on.
+                params.apply_permutations(except_axis=axis)
+                w_a = params.weight_a.to(self.device_b)
+                w_b = params.weight_b.to(self.device_b)
+                b_a = (
+                    params.bias_a.to(self.device_b)
+                    if params.bias_a is not None and axis == 0
+                    else None
+                )
+                b_b = (
+                    params.bias_b.to(self.device_b)
+                    if params.bias_b is not None and axis == 0
+                    else None
+                )
 
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
@@ -181,6 +213,10 @@ class PermutationCoordinateDescent:
                 #   as similar as possible between the two.
                 cost_tensor += w_a @ w_b
 
+                # Add the biases if they exist.
+                if b_a is not None and b_b is not None:
+                    cost_tensor += b_a @ b_b
+
             # Calculate the ideal permutations of the rows and columns
             #   of the cost tensor in order to maximize its closeness to
             #   the identity matrix (see `calculate_progress`).
@@ -206,13 +242,13 @@ class PermutationCoordinateDescent:
             #   we can stop early.
             progress = progress or calculate_progress(
                 cost_tensor,
-                perm_old=permutation.perm_indices,
+                perm_old=perm.perm_indices,
                 perm_new=ci,
                 device=self.device_b
             )
 
             # Update the permutation.
-            self.permutations[i].perm_indices = ci
+            perm.perm_indices = ci
 
         return progress
 
@@ -224,7 +260,4 @@ class PermutationCoordinateDescent:
         if self.verbose:
             print("Applying permutations...")
 
-        loop = tqdm(self.permutations, disable=not self.verbose)
-        for permutation in loop:
-            permutation.apply()
-            loop.refresh()
+        self.pinit.paths.apply_permutations()

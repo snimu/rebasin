@@ -10,15 +10,13 @@ An implementation of methods described in
 
 Can be applied to **arbitrary models**, without modification.
 
-**ATTENTION: I found a severe bug in my code, and am in the process of fixing it. 
-Disregard the results below.**
-
 ---
 
 **Table of Contents**
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Limitations](#limitations)
 - [Results: Weight-matching (PermutationCoordinateDescent)](#results-weight-matching-permutationcoordinatedescent)
   - [HLB-GPT](#hlb-gpt)
   - [torchvision.models](#torchvisionmodels)
@@ -26,7 +24,6 @@ Disregard the results below.**
     - [General takeaways](#general-takeaways)
     - [vit_b_16](#vitb16)
     - [efficientnet_b1](#efficientnetb1)
-- [Plans](#plans)
 - [Acknowledgements](#acknowledgements)
 
 ## Installation
@@ -80,6 +77,87 @@ lerp.interpolate(steps=10)
 # Access model with lowest validation loss:
 lerp.best_model
 ```
+
+## Limitations
+
+### Only some methods are implemented
+
+Currently, only weight-matching is implemented as a method for rebasing, 
+    and only a simplified form of linear interpolation is implemented.
+
+
+
+### Limitations of the `PermutationCoordinateDescent`-class
+
+The `PermutationCoordinateDescent`-class only permutes some Modules:
+
+For one thing, it only permutes the weights of modules with a `weight`-attribute.
+This means, for example, that `nn.MultiheadAttention` is currently not supported.
+There are plans in place to remedy this, but it will take some time.
+
+There is a second limitation, caused by the requirement to have the permuted model
+behave the same as the original model.
+
+It splits a network into linear paths. This means, for example, that a residual path
+splits the network for the purpose of permutation, into four paths:
+
+ 1. The Path up to the residual path.
+ 2. The main path in the residual path.
+ 3. The shortcut path.
+ 4. The path after the residual path.
+
+For each path, the input-permutation of the first module and the output permutation of
+the last module in that path are the identity &mdash; they are not permuted.
+
+This is because **each path needs to permute the weights in it in such a way that the
+total permutation of that path is the identity**. In other words, the permuted model 
+should not change its behavior due to the permutation.
+
+This property limits the number of modules that are permuted. 
+
+Consider the following example:
+
+<p align="center">
+  <img 
+    src="images/vit_b_16_residual_mlp.png" 
+    alt="A residual path including an MLP in ViT_B_16 by torchvision.models" 
+    width="500"
+  />
+</p>
+
+It is a view from the graph of the `vit_b_16`-model from `torchvision.models`
+(see [here](images/vit_b_16.pdf) for the full model). 
+
+In it, the only Modules with weights are the two `Linear`-layers. 
+This means that the only things getting permuted are the output-axis 
+of the weight of the first `Linear`-layer and its bias, and the input-axis of the weight of the second
+layer.
+
+In other words, if we name these two `Linear`-layers `Linear1` and `Linear2`,
+then `Linear1.weight` at axis 0, `Linear2.weight` at axis 1, and 
+`Linear1.bias` are permuted.
+
+Only permuting so few parts of the model might lead to a poor rebasing, because `model_b` 
+may be moved only slightly towards `model_a`. 
+
+As a hint to how much this might be the case,
+I applied random permutations to `torchvision.models.vit_b_16` with the weights 
+`torchvision.models.ViT_B_16_Weights.IMAGENET1K_V1`. The above constraints were in place.
+I then calculated the model change (as defined [here](tests/fixtures/util.py))
+between the original `model_b` and its rebasined version
+It is circa **83.8%**. The output between the original model and the rebasined model
+only changes by **4.3e-7** (**4.3e-5%**, or **0.000043%**), as measured by 
+`(y_orig - y_new).abs().sum() / y_orig.abs().sum()`. 
+
+The output change is very low, as expected.
+However, while the model change is fairly high, it might be interesting to 
+see if it could be brought higher. 
+
+To remedy this second issue, I plan to give `PermutationCoordinateDescent` the option 
+`enforce_identity: bool = True`. If this is set to `False`, then the permutations
+will not be constrained to be the identity at the start and end of each path.
+
+It will be interesting to see if this reduces a model's performance, and if so, by how much.
 
 ## Results: Weight-matching (PermutationCoordinateDescent)
 
@@ -280,28 +358,6 @@ rebasined model lies very close to the optimum for CIFAR10
 
 ---
 
-## Plans
-
-Here, I present my near-term plans for this package. They may change.
-
-- [x] Implement weight-matching
-- [x] Implement linear interpolation
-- [x] Test on other datasets with other models &mdash; for example, I would like to test
-      `rebasin` on [hlb-gpt](https://github.com/tysam-code/hlb-gpt)
-- [ ] Increase unittest-coverage and test on push / merge (GitHub Actions)
-- [ ] Test on ImageNet
-- [ ] Create proper documentation and write docstrings
-- [ ] Implement other rebasing methods:
-    1. Straight-through estimator. This allegedly has better results than weight-matching,
-       though at higher computational cost.
-    2. Activation-matching. Just for completeness.
-- [ ] Implement other interpolation methods:
-    1. Quadratic interpolation
-    2. Cubic interpolation
-    3. Spline interpolation
-      
-    This is especially relevant for interpolating between more than two models at a time.
-
 
 ## Acknowledgements
 
@@ -341,4 +397,8 @@ ImageNet Large Scale Visual Recognition Challenge. arXiv:1409.0575, 2014
 My code took inspiration from the following sources:
 
 - https://github.com/themrzmaster/git-re-basin-pytorch
+
+I used the amazing library `torchview` to visualize the models:
+
+- https://github.com/mert-kurttutan/torchview
 
