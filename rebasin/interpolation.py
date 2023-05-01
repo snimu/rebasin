@@ -183,12 +183,14 @@ class LerpSimple(Interpolation):
             Its signature must be as follows:
 
             .. code-block:: python
-                dev eval_fn(model: nn.Module, device: torch.device | str | None) -> float: ...
+                dev eval_fn(model: nn.Module, device: torch.device | str | None) -> float:
                     ...
 
-            The :code:`model` argument is necessary because different models will have to be
+            The :code:`model` argument is necessary
+            because different models will have to be
             evaluated. The :code:`device` argument is necessary because the different
-            models can be evaluated on different devices (see the :code:`devices` argument).
+            models can be evaluated on different devices
+            (see the :code:`devices` argument).
 
         eval_mode:
             The mode to use for evaluation. If "min", the model with the lowest
