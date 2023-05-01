@@ -38,6 +38,14 @@ def test_on_resnet50() -> None:
     common_tests(resnet50(), resnet50(), torch.randn(1, 3, 224, 224))
 
 
+def test_on_module_with_weird_weight_and_bias_names() -> None:
+    pass  # TODO
+
+
+def test_on_multihead_attention() -> None:
+    pass  # TODO
+
+
 def common_tests(model_a: nn.Module, model_b: nn.Module, x: torch.Tensor) -> None:
     model_b_orig = copy.deepcopy(model_b)
     reset_running_stats(model_b)

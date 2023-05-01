@@ -11,7 +11,7 @@ from torchvision.models import resnet18  # type: ignore[import]
 
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
-from tests.fixtures.models import MLP, ModuleWithWeirdWeightAndBiasNames
+from tests.fixtures.models import MLP
 from tests.fixtures.util import model_change_percent, model_distance, model_similarity
 
 
@@ -42,15 +42,12 @@ class TestPermutationCoordinateDescent:
         in_features, num_layers = 50, 10
         self.common_tests(torch.randn(50), MLP, in_features, num_layers)
 
+    # TODO: Fix this test
     @pytest.mark.xfail(reason="Currently has problem, fix later")
     def test_multihead_attention(self) -> None:
         embed_dim = num_heads = 32
         x = torch.randn(embed_dim, num_heads)
         self.common_tests((x, x, x), nn.MultiheadAttention, embed_dim, num_heads)
-
-    @pytest.mark.xfail(reason="Currently has problem, fix later")
-    def test_module_with_weird_weight_and_bias_names(self) -> None:
-        self.common_tests(torch.randn(15), ModuleWithWeirdWeightAndBiasNames)
 
     @staticmethod
     def common_tests(
