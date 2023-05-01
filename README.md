@@ -145,12 +145,13 @@ I applied random permutations to `torchvision.models.vit_b_16` with the weights
 `torchvision.models.ViT_B_16_Weights.IMAGENET1K_V1`. The above constraints were in place.
 I then calculated the model change (as defined [here](tests/fixtures/util.py))
 between the original `model_b` and its rebasined version
-It is circa 83.8%. The output between the original model and the rebasined model
-only changes by 4.3e-7 (4.3e-5%, or 0.000043%), as measured by 
+It is circa **83.8%**. The output between the original model and the rebasined model
+only changes by **4.3e-7** (**4.3e-5%**, or **0.000043%**), as measured by 
 `(y_orig - y_new).abs().sum() / y_orig.abs().sum()`. 
 
-The model change is still fairly high, and the output change is very low, as expected.
-However, the model change could be higher. 
+The output change is very low, as expected.
+However, while the model change is fairly high, it might be interesting to 
+see if it could be brought higher. 
 
 To remedy this second issue, I plan to give `PermutationCoordinateDescent` the option 
 `enforce_identity: bool = True`. If this is set to `False`, then the permutations
