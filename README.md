@@ -121,7 +121,7 @@ Consider the following example:
   <img 
     src="images/vit_b_16_residual_mlp.png" 
     alt="A residual path including an MLP in ViT_B_16 by torchvision.models" 
-    width="300"
+    width="500"
   />
 </p>
 
