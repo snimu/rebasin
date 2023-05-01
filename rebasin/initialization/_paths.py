@@ -101,7 +101,7 @@ class ModelPaths:
                         path[out_pt].module_type is nn.LayerNorm
                         or len(path[out_pt].axis_to_permutation) == 1
                 )
-                and -out_pt <= len(path)
+                and -out_pt < len(path)
         ):
             out_pt -= 1
             identity = Permutation(
