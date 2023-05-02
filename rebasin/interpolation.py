@@ -183,7 +183,9 @@ class LerpSimple(Interpolation):
             Its signature must be as follows:
 
             .. code-block:: python
-                dev eval_fn(model: nn.Module, device: torch.device | str | None) -> float:
+                dev eval_fn(
+                    model: nn.Module, device: torch.device | str | None
+                ) -> float:
                     ...
 
             The :code:`model` argument is necessary
