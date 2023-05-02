@@ -11,7 +11,7 @@ from torch import nn
 from rebasin.initialization._paths import ModelPaths
 from rebasin.initialization._permutation import ModuleParameters
 from tests.fixtures.paths import ModuleGenerator
-from tests.fixtures.util import allclose, model_change_percent
+from tests.fixtures.utils import allclose, model_change_percent
 
 
 class TestPaths(ModuleGenerator):

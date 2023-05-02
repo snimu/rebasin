@@ -10,7 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .util import recalculate_batch_norms
+from .utils import recalculate_batch_norms
 
 
 class Interpolation:

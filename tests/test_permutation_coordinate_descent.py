@@ -12,7 +12,7 @@ from torchvision.models import resnet18  # type: ignore[import]
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
 from tests.fixtures.models import MLP
-from tests.fixtures.util import model_change_percent, model_distance, model_similarity
+from tests.fixtures.utils import model_change_percent, model_distance, model_similarity
 
 
 def test_calculate_progress() -> None:

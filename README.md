@@ -151,7 +151,7 @@ may be moved only slightly towards `model_a`.
 As a hint to how much this might be the case,
 I applied random permutations to `torchvision.models.vit_b_16` with the weights 
 `torchvision.models.ViT_B_16_Weights.IMAGENET1K_V1`. The above constraints were in place.
-I then calculated the model change (as defined [here](tests/fixtures/util.py))
+I then calculated the model change (as defined [here](tests/fixtures/utils.py))
 between the original `model_b` and its rebasined version
 It is circa **83.8%**. The output between the original model and the rebasined model
 only changes by **4.3e-7** (**4.3e-5%**, or **0.000043%**), as measured by 

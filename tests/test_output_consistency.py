@@ -12,7 +12,7 @@ import itertools
 import torch
 from torch import nn
 
-from tests.fixtures.util import allclose
+from tests.fixtures.utils import allclose
 
 
 def test_model_output_consistency_tensors() -> None:

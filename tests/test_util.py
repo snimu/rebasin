@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from rebasin.util import contains_parameter, get_inputs_labels, recalculate_batch_norms
+from rebasin.utils import contains_parameter, get_inputs_labels, recalculate_batch_norms
 from tests.fixtures.models import SaveCallCount
 
 
