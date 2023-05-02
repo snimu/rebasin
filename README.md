@@ -72,14 +72,26 @@ lerp.interpolate(steps=10)
 lerp.best_model
 ```
 
+## Terminology
+
+In this document, I will use the following terminology:
+
+- **To rebasin**: To apply one of the methods described in the paper to a model,
+    permuting the rows and columns of its weights (and biases)
+- `model_a`: The model that stays unchanged
+- `model_b`: The model that is changed by rebasin it towards `model_a`
+    - `model_b_orig` for the unchanged, original `model_b`
+    - `model_b_rebasin` for the changed, rebasined `model_b`
+- **Path**: A linear sequence of modules in a model
+
 ## Limitations
 
 ### Only some methods are implemented
 
-Currently, only weight-matching is implemented as a method for rebasing, 
-    and only a simplified form of linear interpolation is implemented.
+For rebasin, only weight-matching is implemented via `rebasin.PermutationCoordinateDescent`.
 
-
+For interpolation, only a simplified method of linear interpolation is implemented 
+via `rebasin.interpolation.LerpSimple`.
 
 ### Limitations of the `PermutationCoordinateDescent`-class
 
@@ -92,13 +104,14 @@ There are plans in place to remedy this, but it will take some time.
 There is a second limitation, caused by the requirement to have the permuted model
 behave the same as the original model.
 
-It splits a network into linear paths. This means, for example, that a residual path
-splits the network for the purpose of permutation, into four paths:
+`PermutationCoordinateDescent` splits a network into linear paths. 
+This means, for example, that a residual block somewhere in the model
+splits the network into four paths for the purpose of permutation:
 
  1. The Path up to the residual path.
- 2. The main path in the residual path.
+ 2. The main path in the residual block.
  3. The shortcut path.
- 4. The path after the residual path.
+ 4. The path after the residual block.
 
 For each path, the input-permutation of the first module and the output permutation of
 the last module in that path are the identity &mdash; they are not permuted.
@@ -119,8 +132,9 @@ Consider the following example:
   />
 </p>
 
-It is a view from the graph of the `vit_b_16`-model from `torchvision.models`
-(see [here](images/vit_b_16.pdf) for the full model). 
+It is a view from the graph of the 
+[`vit_b_16`-model](https://pytorch.org/vision/stable/models/generated/torchvision.models.vit_b_16.html#torchvision.models.vit_b_16) 
+from `torchvision.models` (see [here](images/vit_b_16.pdf) for the graph of the full model). 
 
 In it, the only Modules with weights are the two `Linear`-layers. 
 This means that the only things getting permuted are the output-axis 
@@ -128,7 +142,7 @@ of the weight of the first `Linear`-layer and its bias, and the input-axis of th
 layer.
 
 In other words, if we name these two `Linear`-layers `Linear1` and `Linear2`,
-then `Linear1.weight` at axis 0, `Linear2.weight` at axis 1, and 
+then the rows of `Linear1.weight` (axis 0), the columns of `Linear2.weight` (axis 1), and 
 `Linear1.bias` are permuted.
 
 Only permuting so few parts of the model might lead to a poor rebasing, because `model_b` 
@@ -160,9 +174,6 @@ I've moved them to [results-out-of-date.md](results-out-of-date.md), for the sak
 completeness. 
 
 Newer results will follow.
-
----
-
 
 ## Acknowledgements
 
