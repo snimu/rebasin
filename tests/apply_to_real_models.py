@@ -143,8 +143,12 @@ class TorchvisionEval:
     ) -> None:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        if verbose:
+            print("Setting up DataLoaders...")
         self.set_dataloaders(weights_a, weights_b)
 
+        if verbose:
+            print("Setting up models...")
         self.model_a = constructor(weights=weights_a).to(device)
         self.model_b = constructor(weights=weights_b).to(device)
 
@@ -154,6 +158,8 @@ class TorchvisionEval:
                 not self.hparams.ignore_bn
                 and self.hparams.dataset != "imagenet"  # already trained on imagenet
         ):
+            if verbose:
+                print("Recalculating BatchNorms for original models...")
             recalculate_batch_norms(self.model_a, self.train_dl_a, 0, device, verbose)
             recalculate_batch_norms(self.model_b, self.train_dl_b, 0, device, verbose)
 
@@ -170,7 +176,7 @@ class TorchvisionEval:
         rebasin = PermutationCoordinateDescent(
             self.model_a,
             self.model_b,
-            input_data_b=torch.randn(1, 3, 224, 224, device=device),
+            input_data_b=input_data.to(device),
             device_b=device,
             verbose=verbose
         )
@@ -233,6 +239,8 @@ class TorchvisionEval:
 
         # Save results
         # csv saves rows; have to manually transpose
+        if verbose:
+            print("\nSaving results...")
         rows = [
             ["model", *list(results.keys())],
             ("start", loss_a, loss_a, loss_b_original)
@@ -255,11 +263,11 @@ class TorchvisionEval:
 
     def set_dataloaders(self, weights_a: Any, weights_b: Any) -> None:
         if self.hparams.dataset == "cifar10":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_dataloaders(
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_datasets(
                 weights_a, weights_b
             )
         elif self.hparams.dataset == "imagenet":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_dataloaders(
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_datasets(
                 weights_a, weights_b
             )
         else:
@@ -290,7 +298,7 @@ class TorchvisionEval:
             batch_size=self.hparams.batch_size,
         )
 
-    def get_cifar10_dataloaders(
+    def get_cifar10_datasets(
             self, weights_a: Any, weights_b: Any
     ) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
         train_ds_a = CIFAR10(
@@ -319,7 +327,7 @@ class TorchvisionEval:
         )
         return train_ds_a, train_ds_b, val_ds_a, val_ds_b
 
-    def get_imagenet_dataloaders(
+    def get_imagenet_datasets(
             self, weights_a: Any, weights_b: Any
     ) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
         train_ds_a = ImageNet(
