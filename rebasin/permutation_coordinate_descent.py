@@ -122,6 +122,20 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Done.")
 
+    def rebasin(self, max_iterations: int = 100) -> None:
+        """
+        Run the permutation coordinate descent algorithm.
+
+        Args:
+            max_iterations:
+                The maximum number of iterations to run the algorithm for.
+                Likely to converge much faster than this.
+
+                Default: 100.
+        """
+        self.calculate_permutations(max_iterations)
+        self.apply_permutations()
+
     def calculate_permutations(self, max_iterations: int = 100) -> None:
         """
         Run the permutation coordinate descent algorithm to calculate the permutations.

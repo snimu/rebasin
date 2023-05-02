@@ -14,6 +14,96 @@ from .utils import recalculate_batch_norms
 
 
 class Interpolation:
+    """
+    Interpolate between two models.
+
+    The base class for all interpolation classes.
+    This class is not meant to be used directly.
+
+    Args:
+        models:
+            The models to interpolate between.
+            This can be multiple models (see explanation above).
+
+        eval_fn:
+            The function to evaluate the models with.
+            Usually, this simply calculates the loss for every batch in a
+            validation or test dataloader, but it can be anything,
+            including accuracy, or perplexity, etc.
+            By using a :code:`eval_fn`, the user has maximum control.
+
+            Its signature must be as follows:
+
+            .. code-block:: python
+                dev eval_fn(
+                    model: nn.Module, device: torch.device | str | None
+                ) -> float:
+                    ...
+
+            The :code:`model` argument is necessary
+            because different models will have to be
+            evaluated. The :code:`device` argument is necessary because the different
+            models can be evaluated on different devices
+            (see the :code:`devices` argument).
+
+        eval_mode:
+            The mode to use for evaluation. If "min", the model with the lowest
+            metric is chosen, if "max", the model with the highest metric is chosen.
+
+        train_dataloader:
+            The dataloader to use for training the models.
+            If this is given, then the :class:`Interpolation` subclass will check if
+            the model has :code:`BatchNorm` layers and if so, will
+            recalculate their :code:`running_mean` and :code:`running_var`
+            statistics using the training data.
+
+            This is unfortunately strongly recommended if your model includes
+            these statistics.
+
+        devices:
+            Models may need a large amount of GPU-memory.
+            To avoid running out of memory,
+            the argument :code:`devices` can be used to specify which device
+            each of the given models in :code:`models` is on.
+            As each model is evaluated using the function given in :code:`eval_fn`,
+            the corresponding device is passed to :code:`eval_fn` as well.
+
+        device_interp:
+            The device to use for the interpolation.
+            If this is :code:`None`, no parameter will be moved
+            to a different device for interpolation, and the
+            interpolated model will be created on CPU.
+            Again, this argument is useful for saving on memory.
+
+        input_indices:
+            If a training dataloader is given to :code:`train_dataloader`,
+            and the model has :code:`BatchNorm` layers, then the
+            :code:`running_mean` and :code:`running_var` statistics
+            are recalculated using the training data.
+            However, :class:`Interpolation` does not know which output from
+            the dataloader is the input to the model. Sometimes,
+            a model takes several inputs, sometimes, and input and a target
+            are given by the dataloader, etc.
+            To solve this, the argument :code:`input_indices` can be used
+            to provide the indices of the inputs to the model.
+
+            Can be an integer or a sequence of integers.
+
+            The outputs of the training dataloader corresponding to the
+            indices given here will be used as inputs to the models to
+            recalculate the :code:`running_mean` and :code:`running_var`
+
+        savedir:
+            The directory to save the models in.
+            If :code:`None`, the models are not saved.
+
+        save_all:
+            If :code:`True`, all models are saved,
+            if :code:`False`, only the best model is saved.
+
+        verbose:
+            If :code:`True`, prints the progress of the interpolation.
+    """
     def __init__(
             self,
             models: Sequence[torch.nn.Module],
