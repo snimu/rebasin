@@ -1,3 +1,6 @@
+ci:
+  skip: [mypy, pytest]
+
 repos:
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
