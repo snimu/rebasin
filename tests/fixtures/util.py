@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from rebasin.initialization._permutation import ModuleParameters
+from rebasin.initialization.initializer import PermutationInitialization
 
 
 def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:
@@ -55,3 +56,16 @@ def path_analysis(path: list[ModuleParameters]) -> str:
         pathstr += f"\n\tin: {mp.input_permutation.perm_indices}"
         pathstr += f"\n\tout: {mp.output_permutation.perm_indices}"
     return pathstr
+
+
+def randomize_permutations(initializer: PermutationInitialization) -> None:
+    """Randomize the permutations in :class:`PermutationInitialization`."""
+    for permutation, _ in initializer.perm_to_info:
+        permutation.perm_indices = torch.randperm(len(permutation.perm_indices))
+
+
+def reset_bn_running_stats(model: nn.Module) -> None:
+    """Reset the running statistics of all batch norm modules in the model."""
+    for module in model.modules():
+        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            module.reset_running_stats()
