@@ -95,6 +95,7 @@ class TorchvisionEval:
             assert model_name in MODEL_NAMES, \
                 f"--models: {model_name} not in MODEL_NAMES"
 
+        self.hparams.exclude = self.hparams.exclude or []
         for model_name in self.hparams.exclude:
             assert model_name in MODEL_NAMES, \
                 f"--exclude: {model_name} not in MODEL_NAMES"
