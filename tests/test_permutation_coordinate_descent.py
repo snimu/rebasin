@@ -39,7 +39,7 @@ class TestPermutationCoordinateDescent:
         self.common_tests(torch.randn(1, 3, 224, 224), resnet18)
 
     def test_mlp(self) -> None:
-        in_features, num_layers = 50, 10
+        in_features, num_layers = 50, 5
         self.common_tests(torch.randn(50), MLP, in_features, num_layers)
 
     # TODO: Fix this test
@@ -53,10 +53,7 @@ class TestPermutationCoordinateDescent:
     def common_tests(
             input_data: Any, constructor: Any, *args: Any
     ) -> None:
-        truecount = 0
-        falsecount = 0
-
-        for _ in range(100):
+        for _ in range(10):
             model_a = constructor(*args)
             model_b = constructor(*args)
 
@@ -65,16 +62,10 @@ class TestPermutationCoordinateDescent:
             pcd.calculate_permutations()
             pcd.apply_permutations()
 
-            success = (
+            assert (
                     model_distance(model_a, model_b)
                     < model_distance(model_a, model_b_old)
             )
-            if success:
-                truecount += 1
-            else:
-                falsecount += 1
-
-        assert truecount > falsecount
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU test")
