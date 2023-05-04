@@ -3,8 +3,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from rebasin.initialization._permutation import ModuleParameters
-from rebasin.initialization.initializer import PermutationInitialization
+from rebasin._initializer import PermutationInitialization
+from rebasin.structs import ModuleParameters
 
 
 def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:

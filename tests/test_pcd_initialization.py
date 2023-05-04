@@ -1,5 +1,5 @@
 """Tests for the PermutationCoordinateDescent permutation initialization,
-as defined in rebasin/initialization/initializer.py: PermutationInitialization.
+as defined in rebasin/initialization/_initializer.py: PermutationInitialization.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import torch
 from torch import nn
 from torchvision.models import resnet50  # type: ignore[import]
 
-from rebasin.initialization.initializer import PermutationInitialization
+from rebasin._initializer import PermutationInitialization
 from tests.fixtures.models import MLP
 from tests.fixtures.utils import (
     allclose,

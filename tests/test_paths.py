@@ -8,8 +8,8 @@ from collections.abc import Callable
 import torch
 from torch import nn
 
-from rebasin.initialization._paths import ModelPaths
-from rebasin.initialization._permutation import ModuleParameters
+from rebasin._paths import ModelPaths
+from rebasin.structs import ModuleParameters
 from tests.fixtures.paths import ModuleGenerator
 from tests.fixtures.utils import allclose, model_change_percent
 

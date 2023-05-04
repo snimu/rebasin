@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import torch
 from torch import nn
 
-from rebasin.initialization._permutation import ModuleParameters, Permutation
+from rebasin.structs import ModuleParameters, Permutation
 
 
 def merge_linear_path(path: Sequence[ModuleParameters]) -> None:

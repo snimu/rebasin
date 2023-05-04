@@ -8,8 +8,8 @@ from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
-from rebasin.initialization._permutation import ModuleParameters, Permutation
-from rebasin.initialization.initializer import PermutationInitialization
+from rebasin._initializer import PermutationInitialization
+from rebasin.structs import ModuleParameters, Permutation
 
 
 def calculate_progress(

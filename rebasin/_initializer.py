@@ -6,8 +6,8 @@ import torch
 from torch import nn
 from torchview import FunctionNode, ModuleNode, TensorNode, draw_graph
 
-from rebasin.initialization._paths import ModelPaths
-from rebasin.initialization._permutation import (
+from rebasin._paths import ModelPaths
+from rebasin.structs import (
     ModuleParameters,
     Permutation,
 )
