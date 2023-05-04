@@ -235,6 +235,7 @@ class PermutationCoordinateDescent:
                     cost_tensor += b_a @ b_b
 
             if self.verbose:
+                loop.write(f"Done. Cost matrix shape: {cost_tensor.shape}.")
                 loop.write("Linear Sum Assignment...")
             # Calculate the ideal permutations of the rows and columns
             #   of the cost tensor in order to maximize its closeness to
@@ -252,7 +253,7 @@ class PermutationCoordinateDescent:
                 "The rows of the cost tensor should not change."
 
             if self.verbose:
-                loop.write("Progress calculation...")
+                loop.write("Done. \nProgress calculation...")
             # It is important to calculate the progress because
             #   the `_calculate_permutations_step`-method will be run several times.
             # If there were no interdependence between the permutations,
@@ -267,6 +268,9 @@ class PermutationCoordinateDescent:
                 perm_new=ci,
                 device=self.device_b
             )
+
+            if self.verbose:
+                loop.write(f"Done. Progress: {progress}")
 
             # Update the permutation.
             perm.perm_indices = ci
