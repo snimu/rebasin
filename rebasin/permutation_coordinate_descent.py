@@ -270,7 +270,7 @@ class PermutationCoordinateDescent:
             )
 
             if self.verbose:
-                loop.write(f"Done. Progress: {progress}")
+                loop.write(f"Done. Progress: {progress}\n")
 
             # Update the permutation.
             perm.perm_indices = ci
