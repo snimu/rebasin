@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from collections.abc import Iterator, Sequence
 from typing import Any
 
@@ -216,3 +217,21 @@ def model_info(model: nn.Module) -> ModelInfo:
         num_elements_per_bias_std=num_elements_per_bias_std,
     )
 
+
+def pairwise(iterable: Sequence[Any]) -> Iterator[tuple[Any, Any]]:
+    """
+    Iterate over a sequence pairwise.
+
+    Args:
+        iterable:
+            The sequence.
+
+    Yields:
+        The pairs.
+    """
+    try:
+        return itertools.pairwise(iterable)
+    except AttributeError:
+        a, b = itertools.tee(iterable)
+        next(b, None)
+        return zip(a, b)  # noqa

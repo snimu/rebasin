@@ -4,12 +4,12 @@ The path through the model as parametrized by ~ModuleParameters.
 
 from __future__ import annotations
 
-import itertools
 from collections.abc import Sequence
 
 import torch
 from torch import nn
 
+from rebasin import utils
 from rebasin.structs import ModuleParameters, Permutation
 
 
@@ -17,7 +17,7 @@ def merge_linear_path(path: Sequence[ModuleParameters]) -> None:
     if len(path) < 2:
         return
 
-    for mod0, mod1 in itertools.pairwise(path):
+    for mod0, mod1 in utils.pairwise(path):
         # for mypy:
         assert isinstance(mod0, ModuleParameters)
         assert isinstance(mod1, ModuleParameters)
