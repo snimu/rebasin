@@ -199,19 +199,14 @@ class Interpolation:
 
         assert isinstance(train_dataloader, (DataLoader, type(None)))
 
-        if devices is None:
-            assert device_interp is None
-        else:
+        if devices is not None:
             assert isinstance(devices, Sequence)
             assert all(
                 isinstance(device, (str, torch.device)) for device in devices
             )
             assert len(devices) == len(models)
 
-        if device_interp is None:  # goes both ways
-            assert devices is None
-        else:
-            assert isinstance(device_interp, (str, torch.device))
+        assert isinstance(device_interp, (str, torch.device, type(None)))
 
         assert isinstance(input_indices, (int, Sequence))
         if isinstance(input_indices, Sequence):

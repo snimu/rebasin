@@ -102,25 +102,7 @@ class TestInterpolation(BaseClass):
                 models=self.models,
                 eval_fn=self.eval_fn,
                 eval_mode="min",
-                devices=["cpu", "cpu", "cpu"],
-                device_interp=None
-            )
-
-        with pytest.raises(AssertionError):
-            interp.Interpolation(
-                models=self.models,
-                eval_fn=self.eval_fn,
-                eval_mode="min",
                 devices=["cpu", "cpu", "cpu", "cpu"],  # too long
-                device_interp="cpu"
-            )
-
-        with pytest.raises(AssertionError):
-            interp.Interpolation(
-                models=self.models,
-                eval_fn=self.eval_fn,
-                eval_mode="min",
-                devices=None,
                 device_interp="cpu"
             )
 
