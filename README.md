@@ -203,10 +203,22 @@ ImageNet Large Scale Visual Recognition Challenge. arXiv:1409.0575, 2014
 [Paper (link)](https://arxiv.org/abs/1409.0575) (Accessed on April 12th, 2023)
 
 
-**Models:**
+**Torchvision models**
 
-- The torchvision models (v.015), of course: https://pytorch.org/vision/0.15/models.html
-- HLB-GPT by @tysam-code: https://github.com/tysam-code/hlb-gpt
+For testing, I've used the torchvision models (v.015), of course: 
+
+https://pytorch.org/vision/0.15/models.html
+
+**HLB-GPT**
+For testing, I also used [HLB-GPT](https://github.com/tysam-code/hlb-gpt) by @tysam-code: 
+
+    authors:
+      - family-names: "Balsam"
+        given-names: "Tysam&"
+    title: "hlb-gpt"
+    version: 0.0.0
+    date-released: 2023-03-05
+    url: "https://github.com/tysam-code/hlb-gpt"
 
 
 **Other**
