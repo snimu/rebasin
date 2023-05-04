@@ -148,14 +148,15 @@ class PermutationCoordinateDescent:
         if self.verbose:
             print("Calculating permutations...")
 
-        for iteration in tqdm(range(max_iterations), disable=not self.verbose):
-            progress = self._calculate_permutations_step()
+        loop = tqdm(range(max_iterations), disable=not self.verbose)
+        for iteration in loop:
+            progress = self._calculate_permutations_step(loop)
             if not progress:
                 if self.verbose:
                     print(f"Stopping early after {iteration + 1} steps.")
                 break
 
-    def _calculate_permutations_step(self) -> bool:
+    def _calculate_permutations_step(self, loop: tqdm[int]) -> bool:
         """
         Run one iteration of the permutation coordinate descent algorithm.
 
@@ -174,6 +175,8 @@ class PermutationCoordinateDescent:
             n = len(perm.perm_indices)
             cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
+            if self.verbose:
+                loop.write("Calculating cost tensor...")
             for axis, module_parameters in perm_info:
                 # Copy so that the original parameter isn't moved to device_b.
                 # If this were not done, then in one of the later steps,
@@ -231,6 +234,8 @@ class PermutationCoordinateDescent:
                 if b_a is not None and b_b is not None:
                     cost_tensor += b_a @ b_b
 
+            if self.verbose:
+                loop.write("Linear Sum Assignment...")
             # Calculate the ideal permutations of the rows and columns
             #   of the cost tensor in order to maximize its closeness to
             #   the identity matrix (see `calculate_progress`).
@@ -246,6 +251,8 @@ class PermutationCoordinateDescent:
             assert torch.allclose(ri, torch.arange(n)), \
                 "The rows of the cost tensor should not change."
 
+            if self.verbose:
+                loop.write("Progress calculation...")
             # It is important to calculate the progress because
             #   the `_calculate_permutations_step`-method will be run several times.
             # If there were no interdependence between the permutations,
