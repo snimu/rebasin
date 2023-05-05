@@ -360,7 +360,4 @@ def draw_ax(
 
 
 if __name__ == "__main__":
-    for file in file_generator("torchvision", "cifar10"):
-        print(file)
-        line_plot(file)
-        bar_plot(file)
+    draw_hlb_gpt()
