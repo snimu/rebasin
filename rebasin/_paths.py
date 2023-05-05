@@ -40,8 +40,13 @@ def merge_linear_path(path: Sequence[ModuleParameters]) -> None:
 
 
 class ModelPaths:
-    def __init__(self, paths: Sequence[Sequence[ModuleParameters]]) -> None:
+    def __init__(
+            self,
+            paths: Sequence[Sequence[ModuleParameters]],
+            enforce_identity: bool = True
+    ) -> None:
         self.paths = paths
+        self.enforce_identity = enforce_identity
 
     def apply_permutations(self) -> None:
         # Make sure that the constraints on the permutations are applied:
@@ -59,9 +64,14 @@ class ModelPaths:
         for path in self.paths:
             if not path:
                 continue
-            self._make_input_identity(path)
+
+            if self.enforce_identity:
+                self._make_input_identity(path)
+
             merge_linear_path(path)
-            self._make_output_identity(path)
+
+            if self.enforce_identity:
+                self._make_output_identity(path)
 
     @staticmethod
     def _make_input_identity(path: Sequence[ModuleParameters]) -> None:

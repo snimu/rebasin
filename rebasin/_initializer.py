@@ -26,7 +26,8 @@ class PermutationInitialization:
             model_a: nn.Module,
             model_b: nn.Module,
             input_data_b: Any,
-            input_data_a: Any | None = None
+            input_data_a: Any | None = None,
+            enforce_identity: bool = True,
     ) -> None:
         self.model_a = model_a
         self.model_b = model_b
@@ -39,6 +40,8 @@ class PermutationInitialization:
 
         self.input_data_b = input_data_b
         self.input_data_a = input_data_a if input_data_a is not None else input_data_b
+        self.enforce_identity = enforce_identity
+
         self.paths = self._trace_path()
         self.paths.merge_permutations()
 
@@ -49,6 +52,8 @@ class PermutationInitialization:
         self.perm_to_info: list[
             tuple[Permutation, list[tuple[int, ModuleParameters]]]
         ] = []
+
+        # TODO: Ignore the permutations that are the identity anyways!
         self._get_permutations()
 
     def _trace_path(self) -> ModelPaths:
@@ -92,7 +97,7 @@ class PermutationInitialization:
             working_nodes_a = new_working_nodes_a
             working_nodes_b = new_working_nodes_b
 
-        return ModelPaths(paths)
+        return ModelPaths(paths, enforce_identity=self.enforce_identity)
 
     def _trace_path_from_node(
             self,

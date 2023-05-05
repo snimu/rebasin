@@ -69,8 +69,12 @@ class PermutationCoordinateDescent:
     Args:
         model_a:
             The target model.
+
+            Type: :class:`torch.nn.Module`.
         model_b:
             The model that will have its weights permuted.
+
+            Type: :class:`torch.nn.Module`.
         input_data_b:
             The input data to the model_b.
             Used for tracing the model, so as long as the model can
@@ -78,12 +82,17 @@ class PermutationCoordinateDescent:
             As this may be anything, this class cannot move it to any device.
             Therefore, it is the user's responsibility to ensure that
             :code:`input_data` is on the same device as :code:`model_b`.
+
+            Type: Any.
         input_data_a:
             The input data to the model_a.
             The same comments apply as to :code:`input_data_b`.
             However, this argument is optional. If it is :code:`None`,
             then :code:`input_data_b` will be used for both models.
             Make sure that the device is correct in this case.
+
+            Type: Any | None.
+            Default: None.
         device_a:
             The device on which :code:`model_a` is located.
             Both :code:`model_a` and :code:`model_b` must
@@ -91,10 +100,27 @@ class PermutationCoordinateDescent:
             The purpose of this argument is to allow the user to
             use multiple GPUs if the models are so large that
             only one fits on a single GPU.
+
+            Type: torch.device | str | None.
+            Default: None.
         device_b:
             The device on which :code:`model_b` is located.
+
+            Type: torch.device | str | None.
+            Default: None.
         verbose:
             If True, progress will be printed to the console.
+
+            Type: bool.
+            Default: False.
+        enforce_identity:
+            If True, the permutations will be applied to :code:`model_b` in such a way
+            that the model's output is unchanged.
+            If False, they won't. However, more filters will be permuted,
+            which will lead to :code:`model_b` being closer to :code:`model_a`.
+
+            Type: bool.
+            Default: True.
     """
 
     def __init__(
@@ -105,7 +131,8 @@ class PermutationCoordinateDescent:
             input_data_a: Any | None = None,
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
-            verbose: bool = False
+            verbose: bool = False,
+            enforce_identity: bool = True,
     ) -> None:
         self.model_b = model_b
         self.device_a = device_a
@@ -116,7 +143,7 @@ class PermutationCoordinateDescent:
             print("Initializing permutations...")
 
         self.pinit = PermutationInitialization(
-            model_a, model_b, input_data_b, input_data_a
+            model_a, model_b, input_data_b, input_data_a, enforce_identity
         )
 
         if verbose:
