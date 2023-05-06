@@ -1,3 +1,13 @@
+## Initialization
+
+- Give `ModuleParameters` an `internal_permutations` property,
+   so that e.g. `MultiheadAttention` can be permuted internally.
+- Split path into `LinearPath` and `ResidualPath`. In the latter, 
+   the `output_permutation` of the last layer must be equal to the
+   one of the last layer of the prior path. This is because 
+   the first `input_permutation` makes up for the last `output_permutation` 
+   of the prior path, but not in the residual. 
+
 ## `Rebasin`
 
 The main class for the rebasin algorithm.
