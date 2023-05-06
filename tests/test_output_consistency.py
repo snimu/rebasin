@@ -7,12 +7,13 @@ This is for different Module-types.
 
 from __future__ import annotations
 
+import copy
 import itertools
 
 import torch
 from torch import nn
 
-from tests.fixtures.utils import allclose
+from tests.fixtures.utils import allclose, model_change_percent
 
 
 def test_model_output_consistency_tensors() -> None:
@@ -571,4 +572,44 @@ class TestConsistencyBatchNorm3d:
             y_new = model(x)
 
             assert allclose(y_orig, y_new)
+
+
+class TestConsistencyPath:
+    @staticmethod
+    def test_path() -> None:
+        size = 4
+        relu = nn.ReLU()
+        lin1 = nn.Linear(size, size, bias=False)
+
+        lin_res1 = nn.Linear(size, size, bias=False)
+        lin_res2 = nn.Linear(size, size, bias=False)
+
+        residual_path = nn.Sequential(lin_res1, nn.ReLU(), lin_res2, nn.ReLU())
+
+        lin2 = nn.Linear(size, size, bias=False)
+
+        class ResBlock(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return x + residual_path(x)  # type: ignore[no-any-return]
+
+        model = nn.Sequential(lin1, relu, ResBlock(), lin2, relu)
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(size)
+        y_orig = model(x)
+
+        perm1 = [1, 3, 0, 2]
+        perm2 = [1, 2, 3, 0]
+
+        lin1.weight.data = lin1.weight.data[perm1]
+        lin_res1.weight.data = lin_res1.weight.data[:, perm1]
+        lin_res1.weight.data = lin_res1.weight.data[perm2]
+        lin_res2.weight.data = lin_res2.weight.data[:, perm2]
+        lin_res2.weight.data = lin_res2.weight.data[perm1]
+        lin2.weight.data = lin2.weight.data[:, perm1]
+
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+
+        assert allclose(y_orig, y_new)
 
