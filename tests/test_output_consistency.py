@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import itertools
 
+import pytest
 import torch
 from torch import nn
 
@@ -572,6 +573,49 @@ class TestConsistencyBatchNorm3d:
             y_new = model(x)
 
             assert allclose(y_orig, y_new)
+
+
+class TestMultiheadAttention:
+    @staticmethod
+    def test_io() -> None:
+        embed_dim = 6
+        num_heads = 3
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.mha = nn.MultiheadAttention(embed_dim, num_heads, bias=False)
+                self.lin1 = nn.Linear(embed_dim, embed_dim, bias=False)
+                self.lin2 = nn.Linear(embed_dim, embed_dim, bias=False)
+                self.relu = nn.ReLU()
+
+            def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
+                input_tensor = self.relu(self.lin1(input_tensor))
+                input_tensor = self.relu(
+                    self.mha(input_tensor, input_tensor, input_tensor)[0]
+                )
+                input_tensor = self.relu(self.lin2(input_tensor))
+                return input_tensor
+
+        model = Model()
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(embed_dim, embed_dim)
+        y_orig = model(x)
+
+        perm1 = torch.tensor([0, 2, 4, 3, 5, 1], dtype=torch.long)
+        perm2 = torch.tensor([2, 4, 5, 3, 0, 1], dtype=torch.long)
+
+        model.lin1.weight.data = model.lin1.weight.data[perm1]
+        model.mha.in_proj_weight.data = model.mha.in_proj_weight.data[:, perm1]
+        model.mha.out_proj.weight.data = model.mha.out_proj.weight.data[perm2]
+        model.lin2.weight.data = model.lin2.weight.data[:, perm2]
+
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+
+        assert allclose(y_orig, y_new)
 
 
 class TestConsistencyPath:
