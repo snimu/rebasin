@@ -66,19 +66,19 @@ class ModuleBase:
         self.module_type = type(module_a)
 
     @property
-    def input_permutation(self) -> Permutation:
+    def input_permutation(self) -> Permutation | None:
         raise NotImplementedError
 
     @input_permutation.setter
-    def input_permutation(self, perm: Permutation) -> None:
+    def input_permutation(self, perm: Permutation | None) -> None:
         raise NotImplementedError
 
     @property
-    def output_permutation(self) -> Permutation:
+    def output_permutation(self) -> Permutation | None:
         raise NotImplementedError
 
     @output_permutation.setter
-    def output_permutation(self, perm: Permutation) -> None:
+    def output_permutation(self, perm: Permutation | None) -> None:
         raise NotImplementedError
 
     @property
@@ -93,7 +93,22 @@ class ModuleBase:
     def permute_parameter(
             param: nn.Parameter, axis: int, perm_indices: torch.Tensor
     ) -> None:
-        raise NotImplementedError
+        """
+        Permute a parameter along a given axis.
+
+        Args:
+            param:
+                The parameter to permute.
+            axis:
+                The axis along which to permute.
+            perm_indices:
+                The permutation indices.
+        """
+        perm_indices = perm_indices.to(param.device)
+        x = param.data.moveaxis(axis, 0)
+        x = x[perm_indices]
+        x = x.moveaxis(0, axis)
+        param.data = x
 
 
 class DefaultModule(ModuleBase):
@@ -151,7 +166,7 @@ class DefaultModule(ModuleBase):
                     f"{self.module_a.bias.shape} vs {self.module_b.bias.shape}"
                 )
 
-        self.axis_to_permutation = {
+        self.axis_to_permutation: dict[int, Permutation | None] = {
             0: Permutation(torch.arange(self.module_b.weight.shape[0]))
         }
         if len(self.module_a.weight.shape) > 1:
@@ -160,27 +175,27 @@ class DefaultModule(ModuleBase):
             )
 
     @property
-    def input_permutation(self) -> Permutation:
+    def input_permutation(self) -> Permutation | None:
         if len(self.axis_to_permutation) == 1:
             return self.axis_to_permutation[0]
         else:
             return self.axis_to_permutation[1]
 
     @input_permutation.setter
-    def input_permutation(self, perm: Permutation) -> None:
+    def input_permutation(self, perm: Permutation | None) -> None:
         if len(self.axis_to_permutation) == 1:
             self.axis_to_permutation[0] = perm
         else:
             self.axis_to_permutation[1] = perm
 
     @property
-    def output_permutation(self) -> Permutation:
+    def output_permutation(self) -> Permutation | None:
         return self.axis_to_permutation[0]
 
     @output_permutation.setter
-    def output_permutation(self, perm: Permutation) -> None:
+    def output_permutation(self, perm: Permutation | None) -> None:
         if self.module_type is nn.LayerNorm and len(self.axis_to_permutation) > 1:
-            self.axis_to_permutation[0] = Permutation(torch.arange(len(perm)))
+            self.axis_to_permutation[0] = None
         else:
             self.axis_to_permutation[0] = perm
 
@@ -190,6 +205,8 @@ class DefaultModule(ModuleBase):
         id_to_permutation: dict[int, Permutation] = {}
 
         for axis, permutation in self.axis_to_permutation.items():
+            if permutation is None:
+                continue
             id_to_permutation[id(permutation)] = permutation
 
             infos = [
@@ -217,12 +234,8 @@ class DefaultModule(ModuleBase):
         return [(id_to_permutation[id_], info) for id_, info in id_to_info.items()]
 
     def apply_permutations(self, except_axis: int = -1) -> None:
-        # for mypy
-        assert isinstance(self.module_a.weight, nn.Parameter)
-        assert isinstance(self.module_b.bias, (nn.Parameter, type(None)))
-
         for axis, permutation in self.axis_to_permutation.items():
-            if axis == except_axis:
+            if permutation is None or axis == except_axis:
                 continue
             self.permute_parameter(
                 self.module_b.weight,  # type: ignore[arg-type]
@@ -230,36 +243,134 @@ class DefaultModule(ModuleBase):
             )
             if self.module_b.bias is not None and axis == 0:  # axis 0: out-dim -> bias
                 self.permute_parameter(
-                    self.module_b.bias, axis, permutation.perm_indices
+                    self.module_b.bias,  # type: ignore[arg-type]
+                    axis, permutation.perm_indices
                 )
-
-    @staticmethod
-    @torch.no_grad()
-    def permute_parameter(
-            param: nn.Parameter, axis: int, perm_indices: torch.Tensor
-    ) -> None:
-        """
-        Permute a parameter along a given axis.
-
-        Args:
-            param:
-                The parameter to permute.
-            axis:
-                The axis along which to permute.
-            perm_indices:
-                The permutation indices.
-        """
-        perm_indices = perm_indices.to(param.device)
-        x = param.data.moveaxis(axis, 0)
-        x = x[perm_indices]
-        x = x.moveaxis(0, axis)
-        param.data = x
 
 
 class MultiheadAttentionModule(ModuleBase):
     """
     A module for :class:`nn.MultiheadAttention`.
     """
+    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
+        super().__init__(module_a, module_b)
+
+        if not isinstance(module_a, nn.MultiheadAttention):
+            raise TypeError(
+                f"Module A is not a nn.MultiheadAttention, but a {type(module_a)}."
+            )
+        if not isinstance(module_b, nn.MultiheadAttention):
+            raise TypeError(
+                f"Module B is not a nn.MultiheadAttention, but a {type(module_b)}."
+            )
+
+        self._input_permutation: Permutation | None = Permutation(
+            torch.arange(module_b.in_proj_weight.shape[1])
+        ) if module_b.in_proj_weight is not None else None
+
+        self._output_permutation: Permutation | None = Permutation(
+            torch.arange(module_b.out_proj.weight.shape[0])
+        )
+
+    @property
+    def input_permutation(self) -> Permutation | None:
+        return self._input_permutation
+
+    @input_permutation.setter
+    def input_permutation(self, perm: Permutation | None) -> None:
+        if self.module_b.in_proj_weight is None:
+            return
+
+        if (
+                perm is not None
+                and self._input_permutation is not None
+                and len(perm) != len(self._input_permutation)
+        ):
+            raise ValueError(
+                f"Permutation length {len(perm)} does not match "
+                f"input permutation length {len(self._input_permutation)}."
+            )
+        self._input_permutation = perm
+
+    @property
+    def output_permutation(self) -> Permutation | None:
+        return self._output_permutation
+
+    @output_permutation.setter
+    def output_permutation(self, perm: Permutation | None) -> None:
+        if (
+                perm is not None
+                and self._output_permutation is not None
+                and len(perm) != len(self._output_permutation)
+        ):
+            raise ValueError(
+                f"Permutation length {len(perm)} does not match "
+                f"output permutation length {len(self._output_permutation)}."
+            )
+        self._output_permutation = perm
+
+    @property
+    def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
+        id_to_info: list[tuple[Permutation, list[PermutationInfo]]] = []
+        if self.input_permutation is not None:
+            id_to_info.append(
+                (
+                    self.input_permutation,
+                    [
+                    PermutationInfo(
+                        self,
+                        1,
+                        self.module_a  # type: ignore[arg-type]
+                        .in_proj_weight,
+                        self.module_b  # type: ignore[arg-type]
+                        .in_proj_weight,
+                    )
+                    ]
+                )
+            )
+        if self.output_permutation is not None:
+            info = [
+                PermutationInfo(
+                    self,
+                    0,
+                    self.module_a  # type: ignore[arg-type, union-attr]
+                    .out_proj.weight,
+                    self.module_b  # type: ignore[arg-type, union-attr]
+                    .out_proj.weight,
+                )
+            ]
+
+            if self.module_b.out_proj.bias is not None:  # type: ignore[union-attr]
+                info.append(
+                    PermutationInfo(
+                        self,
+                        0,
+                        self.module_a  # type: ignore[arg-type, union-attr]
+                        .out_proj.bias,
+                        self.module_b  # type: ignore[arg-type, union-attr]
+                        .out_proj.bias,
+                    )
+                )
+            id_to_info.append((self.output_permutation, info))
+
+        return id_to_info
+
+    def apply_permutations(self, except_axis: int = -1) -> None:
+        if self.input_permutation is not None and except_axis != 1:
+            self.permute_parameter(
+                self.module_b.in_proj_weight,  # type: ignore[arg-type]
+                1, self.input_permutation.perm_indices
+            )
+        if self.output_permutation is not None and except_axis != 0:
+            self.permute_parameter(
+                self.module_b.out_proj.weight,  # type: ignore[arg-type, union-attr]
+                0, self.output_permutation.perm_indices
+            )
+            if self.module_b.out_proj.bias is not None:  # type: ignore[union-attr]
+                self.permute_parameter(
+                    self.module_b.out_proj.bias,  # type: ignore[arg-type, union-attr]
+                    0, self.output_permutation.perm_indices
+                )
 
 
 MODULE_TYPES = Union[

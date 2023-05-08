@@ -14,6 +14,7 @@ from rebasin.modules import (
     PermutationInfo,
     initialize_module,
 )
+from tests.fixtures.utils import model_change_percent
 
 
 class TestPermutation:
@@ -95,13 +96,6 @@ def test_base_module() -> None:
     with pytest.raises(NotImplementedError):
         mb.apply_permutations()
 
-    with pytest.raises(NotImplementedError):
-        mb.permute_parameter(
-            mb.module_a.weight,  # type: ignore[arg-type]
-            0,
-            torch.randperm(5),
-        )
-
 
 class TestDefaultModule:
     @staticmethod
@@ -182,7 +176,7 @@ class TestDefaultModule:
         assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
 
         mb.output_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4]))
-        assert mb.output_permutation == Permutation(torch.arange(5))
+        assert mb.output_permutation is None
 
     @staticmethod
     def test_permutation_to_info() -> None:
@@ -307,3 +301,151 @@ class TestDefaultModule:
             parameter[torch.argsort(permutation)],
             parameter_orig
         )
+
+    @staticmethod
+    def test_none_permuation() -> None:
+        lin_a, lin_b = nn.Linear(3, 5), nn.Linear(3, 5)
+        lin_b_orig = copy.deepcopy(lin_b)
+        mb = initialize_module(lin_a, lin_b)
+        mb.input_permutation = None
+        mb.output_permutation = None
+
+        mb.apply_permutations()
+        assert torch.allclose(lin_b.weight, lin_b_orig.weight)
+
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
+        mb.apply_permutations()
+        assert torch.allclose(
+            lin_b.weight[:, torch.argsort(mb.input_permutation.perm_indices)],
+            lin_b_orig.weight
+        )
+
+        mb.input_permutation = Permutation(
+            torch.argsort(mb.input_permutation.perm_indices)
+        )
+        mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0]))
+        mb.apply_permutations()
+
+        assert torch.allclose(
+            lin_b.weight[torch.argsort(mb.output_permutation.perm_indices)],
+            lin_b_orig.weight
+        )
+
+
+class TestMultiheadAttentionModule:
+    @staticmethod
+    def test_permutation_to_info() -> None:
+        embed_dim = 6
+        num_heads = 3
+        mha = nn.MultiheadAttention(embed_dim, num_heads)
+
+        mb = MultiheadAttentionModule(mha, mha)
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
+        mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0, 5]))
+
+        info = mb.permutation_to_info
+        assert info == [
+            (
+                mb.input_permutation,
+                [PermutationInfo(
+                    mb, 1,
+                    mb.module_a.in_proj_weight,  # type: ignore[arg-type]
+                    mb.module_b.in_proj_weight  # type: ignore[arg-type]
+                )]
+            ),
+            (
+                mb.output_permutation,
+                [
+                    PermutationInfo(
+                        mb, 0,
+                        mb.module_a  # type: ignore[arg-type, union-attr]
+                        .out_proj.weight,
+                        mb.module_b  # type: ignore[arg-type, union-attr]
+                        .out_proj.weight
+                    ),
+                    PermutationInfo(
+                        mb, 0,
+                        mb.module_a.out_proj.bias,  # type: ignore[arg-type, union-attr]
+                        mb.module_b.out_proj.bias  # type: ignore[arg-type, union-attr]
+                    ),
+                ]
+            ),
+        ]
+
+    @staticmethod
+    def test_input_permutation() -> None:
+        embed_dim = 6
+        num_heads = 3
+        mha = nn.MultiheadAttention(embed_dim, num_heads, bias=False)
+        mha_orig = copy.deepcopy(mha)
+
+        mb = MultiheadAttentionModule(mha, mha)
+        perm = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
+        mb.input_permutation = perm
+        mb.output_permutation = perm
+
+        assert mb.input_permutation == perm
+        assert mb.output_permutation == perm
+        mb.apply_permutations()
+        assert model_change_percent(mha_orig, mha) > 0.1
+
+        mha = nn.MultiheadAttention(embed_dim, num_heads, bias=False, kdim=4, vdim=5)
+        mha_orig = copy.deepcopy(mha)
+        mb = MultiheadAttentionModule(mha, mha)
+        perm = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
+        mb.input_permutation = perm
+        mb.output_permutation = None
+
+        assert mb.input_permutation is None
+        assert mb.output_permutation is None
+        mb.apply_permutations()
+
+        assert model_change_percent(mha_orig, mha) < 1e-6
+
+    @staticmethod
+    def test_io() -> None:
+        embed_dim = 6
+        num_heads = 3
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.mha = nn.MultiheadAttention(embed_dim, num_heads)
+                self.lin1 = nn.Linear(embed_dim, embed_dim)
+                self.lin2 = nn.Linear(embed_dim, embed_dim)
+                self.relu = nn.ReLU()
+
+            def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
+                input_tensor = self.relu(self.lin1(input_tensor))
+                input_tensor = self.relu(
+                    self.mha(input_tensor, input_tensor, input_tensor)[0]
+                )
+                input_tensor = self.relu(self.lin2(input_tensor))
+                return input_tensor
+
+        model = Model()
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(embed_dim, embed_dim)
+        y_orig = model(x)
+
+        lin1_mod = initialize_module(model.lin1, model.lin1)
+        mha_mod = initialize_module(model.mha, model.mha)
+        lin2_mod = initialize_module(model.lin2, model.lin2)
+
+        perm1 = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
+        perm2 = Permutation(torch.tensor([0, 4, 2, 5, 1, 3]))
+
+        lin1_mod.output_permutation = perm1
+        mha_mod.input_permutation = perm1
+        mha_mod.output_permutation = perm2
+        lin2_mod.input_permutation = perm2
+
+        lin1_mod.apply_permutations()
+        mha_mod.apply_permutations()
+        lin2_mod.apply_permutations()
+
+        assert model_change_percent(model_orig, model) > 0.1
+
+        y_new = model(x)
+        assert torch.allclose(y_orig, y_new)
