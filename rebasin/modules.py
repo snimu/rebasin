@@ -262,10 +262,18 @@ class MultiheadAttentionModule(ModuleBase):
     """
 
 
-MODULE_TYPES = Union[ModuleBase, DefaultModule, MultiheadAttentionModule]
-MODULE_CONSTRUCTOR_TYPES = Union[
-    type[ModuleBase], type[DefaultModule], type[MultiheadAttentionModule]
+MODULE_TYPES = Union[
+    ModuleBase,
+    DefaultModule,
+    MultiheadAttentionModule
 ]
+
+MODULE_CONSTRUCTOR_TYPES = Union[
+    type[ModuleBase],
+    type[DefaultModule],
+    type[MultiheadAttentionModule]
+]
+
 SPECIAL_MODULES: dict[Any, MODULE_CONSTRUCTOR_TYPES] = {
     nn.MultiheadAttention: MultiheadAttentionModule,
 }
