@@ -1,3 +1,10 @@
+# type: ignore
+# I do type-checks in code, but mypy doesn't understand that.
+# This leads to me getting an error from mypy at almost every line,
+# which is annoying.
+# Instead of reformatting my file such that mypy doesn't complain,
+# I just ignore all the errors and make sure to test thoroughly.
+
 from __future__ import annotations
 
 import copy
@@ -8,8 +15,10 @@ from torch import nn
 
 from rebasin.modules import (
     DefaultModule,
+    LayerNormModule,
     ModuleBase,
     MultiheadAttentionModule,
+    OneDimModule,
     Permutation,
     PermutationInfo,
     initialize_module,
@@ -75,7 +84,7 @@ def test_base_module() -> None:
         ModuleBase(nn.Linear(5, 5), nn.Conv2d(5, 5, 3))
 
     with pytest.raises(TypeError):
-        ModuleBase("foo", "bar")  # type: ignore[arg-type]
+        ModuleBase("foo", "bar")
 
     mb = ModuleBase(nn.Linear(5, 5), nn.Linear(5, 5))
     with pytest.raises(NotImplementedError):
@@ -131,22 +140,22 @@ class TestDefaultModule:
 
         with pytest.raises(TypeError):
             lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
-            lin_a.weight = nn.Linear(5, 5)  # type: ignore[assignment]
+            lin_a.weight = nn.Linear(5, 5)
             DefaultModule(lin_a, lin_b)
 
         with pytest.raises(TypeError):
             lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
-            lin_b.weight = nn.Linear(5, 5)  # type: ignore[assignment]
+            lin_b.weight = nn.Linear(5, 5)
             DefaultModule(lin_a, lin_b)
 
         with pytest.raises(TypeError):
             lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
-            lin_a.bias = nn.Linear(5, 5)  # type: ignore[assignment]
+            lin_a.bias = nn.Linear(5, 5)
             DefaultModule(lin_a, lin_b)
 
         with pytest.raises(TypeError):
             lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
-            lin_b.bias = nn.Linear(5, 5)  # type: ignore[assignment]
+            lin_b.bias = nn.Linear(5, 5)
             DefaultModule(lin_a, lin_b)
 
     @staticmethod
@@ -161,23 +170,6 @@ class TestDefaultModule:
         mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0]))
         assert mb.output_permutation == Permutation(torch.tensor([4, 2, 3, 1, 0]))
 
-        # Test 1d weight
-        mb = initialize_module(nn.LayerNorm(4), nn.LayerNorm(4))
-        assert mb.input_permutation == Permutation(torch.arange(4))
-        assert mb.input_permutation is mb.output_permutation
-
-        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
-        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
-
-        # Test nd LayerNorm
-        mb = initialize_module(nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]))
-
-        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
-        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
-
-        mb.output_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4]))
-        assert mb.output_permutation is None
-
     @staticmethod
     def test_permutation_to_info() -> None:
         mb = initialize_module(nn.Linear(3, 5), nn.Linear(3, 5))
@@ -189,22 +181,13 @@ class TestDefaultModule:
             (
                 mb.output_permutation,
                 [
-                    PermutationInfo(
-                        mb, 0,
-                        mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                    ),
-                    PermutationInfo(
-                        mb, 0,
-                        mb.module_a.bias, mb.module_b.bias  # type: ignore[arg-type]
-                    ),
+                    PermutationInfo(mb, 0, mb.module_a.weight, mb.module_b.weight),
+                    PermutationInfo(mb, 0, mb.module_a.bias, mb.module_b.bias),
                 ]
             ),
             (
                 mb.input_permutation,
-                [PermutationInfo(
-                    mb, 1,
-                    mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                )]
+                [PermutationInfo(mb, 1, mb.module_a.weight, mb.module_b.weight)]
             )
         ]
 
@@ -216,17 +199,11 @@ class TestDefaultModule:
         assert info == [
             (
                 mb.output_permutation,
-                [PermutationInfo(
-                    mb, 0,
-                    mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                )]
+                [PermutationInfo(mb, 0, mb.module_a.weight, mb.module_b.weight)]
             ),
             (
                 mb.input_permutation,
-                [PermutationInfo(
-                    mb, 1,
-                    mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                )]
+                [PermutationInfo(mb, 1, mb.module_a.weight, mb.module_b.weight)]
             )
         ]
 
@@ -240,18 +217,9 @@ class TestDefaultModule:
             (
                 mb.input_permutation,
                 [
-                    PermutationInfo(
-                        mb, 0,
-                        mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                    ),
-                    PermutationInfo(
-                        mb, 0,
-                        mb.module_a.bias, mb.module_b.bias  # type: ignore[arg-type]
-                    ),
-                    PermutationInfo(
-                        mb, 1,
-                        mb.module_a.weight, mb.module_b.weight  # type: ignore[arg-type]
-                    ),
+                    PermutationInfo(mb, 0, mb.module_a.weight, mb.module_b.weight),
+                    PermutationInfo(mb, 0, mb.module_a.bias, mb.module_b.bias),
+                    PermutationInfo(mb, 1, mb.module_a.weight, mb.module_b.weight),
                 ]
             )
         ]
@@ -332,6 +300,82 @@ class TestDefaultModule:
         )
 
 
+class TestOneDimModule:
+    @staticmethod
+    def test_io_permutations() -> None:
+        mb = initialize_module(nn.BatchNorm2d(4), nn.BatchNorm2d(4))
+        assert isinstance(mb, OneDimModule)
+        assert mb.input_permutation == Permutation(torch.arange(4))
+        assert mb.input_permutation is mb.output_permutation
+
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
+        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
+
+    @staticmethod
+    def test_apply_permutations() -> None:
+        bn_a, bn_b = nn.BatchNorm2d(4), nn.BatchNorm2d(4)
+        bn_b.weight.data = torch.randn_like(bn_b.weight.data)
+        bn_b.bias.data = torch.randn_like(bn_b.bias.data)
+        bn_b_orig = copy.deepcopy(bn_b)
+
+        mb = initialize_module(bn_a, bn_b)
+
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
+        assert mb.output_permutation is mb.input_permutation
+        mb.apply_permutations()
+
+        assert not torch.allclose(bn_b.weight, bn_b_orig.weight)
+        assert not torch.allclose(bn_b.bias, bn_b_orig.bias)
+
+    @staticmethod
+    def test_none_permutation() -> None:
+        mb = initialize_module(nn.BatchNorm2d(4), nn.BatchNorm2d(4))
+        assert isinstance(mb, OneDimModule)
+        assert mb.input_permutation == Permutation(torch.arange(4))
+        assert mb.input_permutation is mb.output_permutation
+
+        mb.input_permutation = None
+        assert mb.input_permutation is None
+        assert mb.output_permutation is None
+
+
+class TestLayerNormModule:
+    @staticmethod
+    def test_permutation_to_info() -> None:
+        mb = initialize_module(nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]))
+        assert isinstance(mb, LayerNormModule)
+
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
+        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
+
+        mb.output_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4]))
+        assert mb.output_permutation == Permutation(torch.tensor([2, 0, 1, 3, 4]))
+
+    @staticmethod
+    def test_apply_permutations() -> None:
+        ln_a, ln_b = nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5])
+        ln_b.weight.data = torch.randn_like(ln_b.weight.data)
+        ln_b.bias.data = torch.randn_like(ln_b.bias.data)
+        ln_b_orig = copy.deepcopy(ln_b)
+        mb = initialize_module(ln_a, ln_b)
+
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 4, 1, 3]))
+        assert mb.output_permutation is mb.input_permutation
+        mb.apply_permutations()
+
+        assert not torch.allclose(ln_b.weight, ln_b_orig.weight)
+        assert not torch.allclose(ln_b.bias, ln_b_orig.bias)
+
+    @staticmethod
+    def test_none_permutation() -> None:
+        mb = initialize_module(nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]))
+        assert isinstance(mb, LayerNormModule)
+
+        mb.input_permutation = None
+        assert mb.input_permutation is None
+        assert mb.output_permutation is None
+
+
 class TestMultiheadAttentionModule:
     @staticmethod
     def test_permutation_to_info() -> None:
@@ -348,9 +392,7 @@ class TestMultiheadAttentionModule:
             (
                 mb.input_permutation,
                 [PermutationInfo(
-                    mb, 1,
-                    mb.module_a.in_proj_weight,  # type: ignore[arg-type]
-                    mb.module_b.in_proj_weight  # type: ignore[arg-type]
+                    mb, 1, mb.module_a.in_proj_weight, mb.module_b.in_proj_weight
                 )]
             ),
             (
@@ -358,15 +400,13 @@ class TestMultiheadAttentionModule:
                 [
                     PermutationInfo(
                         mb, 0,
-                        mb.module_a  # type: ignore[arg-type, union-attr]
-                        .out_proj.weight,
-                        mb.module_b  # type: ignore[arg-type, union-attr]
-                        .out_proj.weight
+                        mb.module_a.out_proj.weight,
+                        mb.module_b.out_proj.weight
                     ),
                     PermutationInfo(
                         mb, 0,
-                        mb.module_a.out_proj.bias,  # type: ignore[arg-type, union-attr]
-                        mb.module_b.out_proj.bias  # type: ignore[arg-type, union-attr]
+                        mb.module_a.out_proj.bias,
+                        mb.module_b.out_proj.bias
                     ),
                 ]
             ),

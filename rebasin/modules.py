@@ -1,3 +1,10 @@
+# type: ignore
+# I do type-checks in code, but mypy doesn't understand that.
+# This leads to me getting an error from mypy at almost every line,
+# which is annoying.
+# Instead of reformatting my file such that mypy doesn't complain,
+# I just ignore all the errors and make sure to test thoroughly.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -176,17 +183,11 @@ class DefaultModule(ModuleBase):
 
     @property
     def input_permutation(self) -> Permutation | None:
-        if len(self.axis_to_permutation) == 1:
-            return self.axis_to_permutation[0]
-        else:
-            return self.axis_to_permutation[1]
+        return self.axis_to_permutation[1]
 
     @input_permutation.setter
     def input_permutation(self, perm: Permutation | None) -> None:
-        if len(self.axis_to_permutation) == 1:
-            self.axis_to_permutation[0] = perm
-        else:
-            self.axis_to_permutation[1] = perm
+        self.axis_to_permutation[1] = perm
 
     @property
     def output_permutation(self) -> Permutation | None:
@@ -194,10 +195,7 @@ class DefaultModule(ModuleBase):
 
     @output_permutation.setter
     def output_permutation(self, perm: Permutation | None) -> None:
-        if self.module_type is nn.LayerNorm and len(self.axis_to_permutation) > 1:
-            self.axis_to_permutation[0] = None
-        else:
-            self.axis_to_permutation[0] = perm
+        self.axis_to_permutation[0] = perm
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -213,17 +211,21 @@ class DefaultModule(ModuleBase):
                 PermutationInfo(
                     self,
                     axis,
-                    self.module_a.weight,  # type: ignore[arg-type]
-                    self.module_b.weight,  # type: ignore[arg-type]
+                    self.module_a.weight,
+                    self.module_b.weight,
                 )
             ]
-            if self.module_b.bias is not None and axis == 0:
+            if (
+                    hasattr(self.module_b, "bias")
+                    and self.module_b.bias is not None
+                    and axis == 0
+            ):
                 infos.append(
                     PermutationInfo(
                         self,
                         axis,
-                        self.module_a.bias,  # type: ignore[arg-type]
-                        self.module_b.bias,  # type: ignore[arg-type]
+                        self.module_a.bias,
+                        self.module_b.bias,
                     )
                 )
             if id(permutation) in id_to_info:
@@ -238,14 +240,151 @@ class DefaultModule(ModuleBase):
             if permutation is None or axis == except_axis:
                 continue
             self.permute_parameter(
-                self.module_b.weight,  # type: ignore[arg-type]
+                self.module_b.weight,
                 axis, permutation.perm_indices
             )
             if self.module_b.bias is not None and axis == 0:  # axis 0: out-dim -> bias
                 self.permute_parameter(
-                    self.module_b.bias,  # type: ignore[arg-type]
+                    self.module_b.bias,
                     axis, permutation.perm_indices
                 )
+
+
+class OneDimModule(ModuleBase):
+    """For Modules with a 1D :code:`weight` (and :code:`bias`) attribute.
+    """
+
+    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
+        super().__init__(module_a, module_b)
+
+        self._permutation = Permutation(torch.arange(module_b.weight.shape[0]))
+
+    @property
+    def input_permutation(self) -> Permutation | None:
+        return self._permutation
+
+    @input_permutation.setter
+    def input_permutation(self, perm: Permutation | None) -> None:
+        self._permutation = perm
+
+    @property
+    def output_permutation(self) -> Permutation | None:
+        return self._permutation
+
+    @output_permutation.setter
+    def output_permutation(self, perm: Permutation | None) -> None:
+        self._permutation = perm
+
+    @property
+    def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
+        if self._permutation is None:
+            return []
+
+        info = [PermutationInfo(
+            self,
+            0,
+            self.module_a.weight,
+            self.module_b.weight,
+        )]
+        if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
+            assert self.module_a.bias is not None, \
+                "Module A has no bias, but Module B does."
+            info.append(PermutationInfo(
+                self,
+                0,
+                self.module_a.bias,
+                self.module_b.bias,
+            ))
+
+        return [(self._permutation, info)]
+
+    def apply_permutations(self, except_axis: int = -1) -> None:
+        if except_axis == 0 or self._permutation is None:
+            return
+        self.permute_parameter(
+            self.module_b.weight,
+            0, self._permutation.perm_indices
+        )
+        if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
+            assert self.module_a.bias is not None, \
+                "Module A has no bias, but Module B does."
+            self.permute_parameter(
+                self.module_b.bias,
+                0, self._permutation.perm_indices
+            )
+
+
+class LayerNormModule(ModuleBase):
+    """A module for :class:`nn.LayerNorm`."""
+
+    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
+        super().__init__(module_a, module_b)
+        self._permutation = (
+            Permutation(torch.arange(module_b.weight.shape[0]))
+            if len(module_b.weight.shape) == 1
+            else Permutation(torch.arange(module_b.weight.shape[1]))
+        )
+
+    @property
+    def input_permutation(self) -> Permutation | None:
+        return self._permutation
+
+    @input_permutation.setter
+    def input_permutation(self, perm: Permutation | None) -> None:
+        self._permutation = perm
+
+    @property
+    def output_permutation(self) -> Permutation | None:
+        return self._permutation
+
+    @output_permutation.setter
+    def output_permutation(self, perm: Permutation | None) -> None:
+        self._permutation = perm
+
+    @property
+    def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
+        if self._permutation is None:
+            return []
+
+        axis = 0 if len(self.module_b.weight.shape) == 1 else 1
+
+        info = [PermutationInfo(
+            self,
+            axis,
+            self.module_a.weight,
+            self.module_b.weight,
+        )]
+        if self.module_b.bias is not None:
+            assert self.module_a.bias is not None, \
+                "Module A has no bias, but Module B does."
+            info.append(PermutationInfo(
+                self,
+                0,
+                self.module_a.bias,
+                self.module_b.bias,
+            ))
+
+        return [(self._permutation, info)]
+
+    def apply_permutations(self, except_axis: int = -1) -> None:
+        axis = 0 if len(self.module_b.weight.shape) == 1 else 1
+        if except_axis == axis or self._permutation is None:
+            return
+
+        print(axis, len(self.module_b.weight.shape), self.module_b.weight.shape)
+
+        self.permute_parameter(
+            self.module_b.weight,
+            axis, self._permutation.perm_indices
+        )
+
+        if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
+            assert self.module_a.bias is not None, \
+                "Module A has no bias, but Module B does."
+            self.permute_parameter(
+                self.module_b.bias,
+                axis, self._permutation.perm_indices
+            )
 
 
 class MultiheadAttentionModule(ModuleBase):
@@ -320,9 +459,9 @@ class MultiheadAttentionModule(ModuleBase):
                     PermutationInfo(
                         self,
                         1,
-                        self.module_a  # type: ignore[arg-type]
+                        self.module_a
                         .in_proj_weight,
-                        self.module_b  # type: ignore[arg-type]
+                        self.module_b
                         .in_proj_weight,
                     )
                     ]
@@ -333,21 +472,21 @@ class MultiheadAttentionModule(ModuleBase):
                 PermutationInfo(
                     self,
                     0,
-                    self.module_a  # type: ignore[arg-type, union-attr]
+                    self.module_a
                     .out_proj.weight,
-                    self.module_b  # type: ignore[arg-type, union-attr]
+                    self.module_b
                     .out_proj.weight,
                 )
             ]
 
-            if self.module_b.out_proj.bias is not None:  # type: ignore[union-attr]
+            if self.module_b.out_proj.bias is not None:
                 info.append(
                     PermutationInfo(
                         self,
                         0,
-                        self.module_a  # type: ignore[arg-type, union-attr]
+                        self.module_a
                         .out_proj.bias,
-                        self.module_b  # type: ignore[arg-type, union-attr]
+                        self.module_b
                         .out_proj.bias,
                     )
                 )
@@ -358,17 +497,17 @@ class MultiheadAttentionModule(ModuleBase):
     def apply_permutations(self, except_axis: int = -1) -> None:
         if self.input_permutation is not None and except_axis != 1:
             self.permute_parameter(
-                self.module_b.in_proj_weight,  # type: ignore[arg-type]
+                self.module_b.in_proj_weight,
                 1, self.input_permutation.perm_indices
             )
         if self.output_permutation is not None and except_axis != 0:
             self.permute_parameter(
-                self.module_b.out_proj.weight,  # type: ignore[arg-type, union-attr]
+                self.module_b.out_proj.weight,
                 0, self.output_permutation.perm_indices
             )
-            if self.module_b.out_proj.bias is not None:  # type: ignore[union-attr]
+            if self.module_b.out_proj.bias is not None:
                 self.permute_parameter(
-                    self.module_b.out_proj.bias,  # type: ignore[arg-type, union-attr]
+                    self.module_b.out_proj.bias,
                     0, self.output_permutation.perm_indices
                 )
 
@@ -376,30 +515,43 @@ class MultiheadAttentionModule(ModuleBase):
 MODULE_TYPES = Union[
     ModuleBase,
     DefaultModule,
+    OneDimModule,
+    LayerNormModule,
     MultiheadAttentionModule
 ]
 
 MODULE_CONSTRUCTOR_TYPES = Union[
     type[ModuleBase],
     type[DefaultModule],
+    type[OneDimModule],
+    type[LayerNormModule],
     type[MultiheadAttentionModule]
 ]
 
 SPECIAL_MODULES: dict[Any, MODULE_CONSTRUCTOR_TYPES] = {
+    nn.LayerNorm: LayerNormModule,
     nn.MultiheadAttention: MultiheadAttentionModule,
 }
 
 
-def initialize_module(module_a: nn.Module, module_b: nn.Module) -> MODULE_TYPES:
+def initialize_module(module_a: nn.Module, module_b: nn.Module) -> MODULE_TYPES | None:
     """
     Initialize a child of :class:`ModuleBase` for a given module pair.
 
     :param module_a: The :class:`nn.Module` from model_a.
     :param module_b: The corresponding :class:`nn.Module` from module_b.
     :return: The correct child class of :class:`ModuleBase` for the given module pair,
-    initialized with the given modules.
+    initialized with the given modules, if the type of the Module supports permutation,
+    otherwise None.
     """
     if type(module_a) in SPECIAL_MODULES:
         return SPECIAL_MODULES[type(module_a)](module_a, module_b)
 
-    return DefaultModule(module_a, module_b)
+    if hasattr(module_b, "weight") and hasattr(module_a, "weight"):
+        return (
+            OneDimModule(module_a, module_b)
+            if len(module_b.weight.shape) == 1
+            else DefaultModule(module_a, module_b)
+        )
+
+    return None
