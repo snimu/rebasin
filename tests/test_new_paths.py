@@ -10,7 +10,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     Permutation,
     initialize_module,
 )
-from rebasin.paths import LinearPath, ParallelPaths
+from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
 from tests.fixtures.utils import allclose, model_change_percent
 
 
@@ -564,3 +564,104 @@ class TestParallelPaths(PathSource):
 
         y_new = model(x)
         assert allclose(y_orig, y_new)
+
+
+class TestModelPath(PathSource):
+    def test_lin_par_lin_no_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_no_empty_path()
+        model3, path3 = self.dense_lin_path()
+        model = nn.Sequential(model1, model2, model3)
+        graph = ModelGraph(path1, path2, path3)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model3_orig = copy.deepcopy(model3)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm, _ in graph.permutation_to_info:
+            perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+        # Permute
+        graph.enforce_identity()
+        graph.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model3, model3_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_lin_par_lin_with_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_with_empty_path()
+        model3, path3 = self.dense_lin_path()
+        model = nn.Sequential(model1, model2, model3)
+        graph = ModelGraph(path1, path2, path3)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model3_orig = copy.deepcopy(model3)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm, _ in graph.permutation_to_info:
+            perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+        # Permute
+        graph.enforce_identity()
+        graph.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model3, model3_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_par_par_par_par(self) -> None:
+        model1, path1 = self.dense_parallel_path_no_empty_path()
+        model2, path2 = self.dense_parallel_path_with_empty_path()
+        model3, path3 = self.dense_parallel_path_no_empty_path()
+        model4, path4 = self.dense_parallel_path_with_empty_path()
+        model = nn.Sequential(model1, model2, model3, model4)
+        graph = ModelGraph(path1, path2, path3, path4)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model3_orig = copy.deepcopy(model3)
+        model4_orig = copy.deepcopy(model4)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm, _ in graph.permutation_to_info:
+            perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+        # Permute
+        graph.enforce_identity()
+        graph.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model3, model3_orig) > 0.1
+        assert model_change_percent(model4, model4_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+

@@ -320,3 +320,60 @@ class ModelGraph:
 
     Consists of :class:`LinearPath` and :class:`ParallelPaths`.
     """
+    def __init__(self, *paths: LinearPath | ParallelPaths) -> None:
+        self.paths = list(paths)
+        assert all(
+            isinstance(path, (LinearPath, ParallelPaths))
+            for path in self.paths
+        ), "paths must be instances of LinearPath or ParallelPaths"
+
+    def __iter__(self) -> Iterator[LinearPath | ParallelPaths]:
+        return iter(self.paths)
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, index: int) -> LinearPath | ParallelPaths:
+        return self.paths[index]
+
+    @property
+    def input_permutation(self) -> Permutation | None:
+        return self[0].input_permutation
+
+    @input_permutation.setter
+    def input_permutation(self, permutation: Permutation | None) -> None:
+        self[0].input_permutation = permutation
+
+    @property
+    def output_permutation(self) -> Permutation | None:
+        return self[-1].output_permutation
+
+    @output_permutation.setter
+    def output_permutation(self, permutation: Permutation | None) -> None:
+        self[-1].output_permutation = permutation
+
+    @property
+    def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
+        id_to_perminfo: dict[int, tuple[Permutation, list[PermutationInfo]]] = {}
+
+        for path in self:
+            for permutation, info in path.permutation_to_info:
+                if permutation is None:
+                    continue
+                if id(permutation) not in id_to_perminfo:
+                    id_to_perminfo[id(permutation)] = (permutation, info)
+                id_to_perminfo[id(permutation)][1].extend(info)
+
+        return [perm_info for perm_info in id_to_perminfo.values()]
+
+    def enforce_identity(self) -> None:
+        """Enforce the identity constraint on all paths."""
+        for i in range(len(self)):
+            prev_path = self[i - 1] if i > 0 else None
+            next_path = self[i + 1] if i < len(self) - 1 else None
+            self[i].enforce_identity(prev_path=prev_path, next_path=next_path)
+
+    def apply_permutations(self) -> None:
+        """Apply the permutations in the paths to the model."""
+        for path in self:
+            path.apply_permutations()
