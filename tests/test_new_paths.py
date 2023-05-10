@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 import torch
 from torch import nn
@@ -9,13 +10,13 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     Permutation,
     initialize_module,
 )
-from rebasin.paths import LinearPath
+from rebasin.paths import LinearPath, ParallelPaths
 from tests.fixtures.utils import allclose, model_change_percent
 
 
-class TestLinearPath:
-    @property
-    def lin_path(self) -> tuple[nn.Module, LinearPath]:
+class PathSource:
+    @staticmethod
+    def dense_lin_path() -> tuple[nn.Module, LinearPath]:
         ln1 = nn.LayerNorm(10)
         lin1 = nn.Linear(10, 10)
         lin2 = nn.Linear(10, 10)
@@ -31,8 +32,8 @@ class TestLinearPath:
         path = LinearPath(mod0, mod1, mod2, mod3)
         return model, path
 
-    @property
-    def conv_path(self) -> tuple[nn.Module, LinearPath]:
+    @staticmethod
+    def conv_lin_path() -> tuple[nn.Module, LinearPath]:
         ln1 = nn.LayerNorm([3, 10, 10])
         conv1 = nn.Conv2d(3, 3, (3, 3))
         conv2 = nn.Conv2d(3, 3, (3, 3))
@@ -48,26 +49,47 @@ class TestLinearPath:
         path = LinearPath(mod0, mod1, mod2, mod3)
         return model, path
 
+    @classmethod
+    def dense_parallel_path_small(cls) -> tuple[nn.Module, ParallelPaths]:
+        mod1, path1 = cls.dense_lin_path()
+        mod2, path2 = cls.dense_lin_path()
+        mod3, path3 = nn.Sequential(), LinearPath()
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.mod1 = mod1
+                self.mod2 = mod2
+                self.mod3 = mod3
+
+            def forward(self, x: torch.Tensor) -> Any:
+                return self.mod1(x) + self.mod2(x) + self.mod3(x)
+
+        path = ParallelPaths(path1, path2, path3)
+        return Model(), path
+
+
+class TestLinearPath(PathSource):
     def test_len(self) -> None:
-        _, path = self.lin_path
+        _, path = self.dense_lin_path()
         assert len(path) == 4
 
     def test_iter(self) -> None:
-        _, path = self.lin_path
+        _, path = self.dense_lin_path()
         assert list(path) == list(path.modules)
 
     def test_getitem(self) -> None:
-        _, path = self.lin_path
+        _, path = self.dense_lin_path()
         assert path[0] == path.modules[0]
         assert path[1] == path.modules[1]
 
     def test_bool(self) -> None:
-        _, path = self.lin_path
+        _, path = self.dense_lin_path()
         assert bool(path) is True
         assert not LinearPath()
 
     def test_input_permutation(self) -> None:
-        _, lin_path = self.lin_path
+        _, lin_path = self.dense_lin_path()
         assert lin_path.input_permutation == lin_path[0].input_permutation
 
         permutation = Permutation(torch.randperm(10))
@@ -75,7 +97,7 @@ class TestLinearPath:
         assert lin_path.input_permutation is permutation
         assert lin_path[1].input_permutation is permutation  # It's a 1d-module
 
-        _, conv_path = self.conv_path
+        _, conv_path = self.conv_lin_path()
         assert conv_path.input_permutation == conv_path[0].input_permutation
 
         permutation = Permutation(torch.randperm(3))
@@ -85,7 +107,7 @@ class TestLinearPath:
         assert conv_path[1].output_permutation is not permutation
 
     def test_output_permutation(self) -> None:
-        _, lin_path = self.lin_path
+        _, lin_path = self.dense_lin_path()
         assert lin_path.output_permutation == lin_path[-1].output_permutation
 
         permutation = Permutation(torch.randperm(10))
@@ -94,7 +116,7 @@ class TestLinearPath:
         assert lin_path[-1].input_permutation is permutation  # It's a 1d-module
         assert lin_path[-2].output_permutation is permutation  # It's 1d and a LayerNorm
 
-        _, conv_path = self.conv_path
+        _, conv_path = self.conv_lin_path()
         assert conv_path.output_permutation == conv_path[-1].output_permutation
 
         permutation = Permutation(torch.randperm(3))
@@ -105,7 +127,7 @@ class TestLinearPath:
         assert conv_path[-2].output_permutation is permutation
 
     def test_io_linear(self) -> None:
-        lin_model, lin_path = self.lin_path
+        lin_model, lin_path = self.dense_lin_path()
         lin_model_orig = copy.deepcopy(lin_model)
         x = torch.randn(10, 10)
         y_orig = lin_model(x)
@@ -124,7 +146,7 @@ class TestLinearPath:
         assert allclose(y_orig, y_new)
 
     def test_io_conv(self) -> None:
-        conv_model, conv_path = self.conv_path
+        conv_model, conv_path = self.conv_lin_path()
         conv_model_orig = copy.deepcopy(conv_model)
         x = torch.randn(1, 3, 10, 10)
         y_orig = conv_model(x)
@@ -146,6 +168,45 @@ class TestLinearPath:
         y_new = conv_model(x)
         assert allclose(y_orig, y_new)
 
+    def test_enforce_identity(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_lin_path()
+        model3, path3 = self.dense_lin_path()
+
+        model = nn.Sequential(model1, model2, model3)
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+                path1.permutation_to_info,
+                path2.permutation_to_info,
+                path3.permutation_to_info
+        ):
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+            perm3.perm_indices = torch.randperm(len(perm3.perm_indices))
+
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=path3)
+        path3.enforce_identity(prev_path=path2, next_path=None)
+
+        assert path1.input_permutation is None
+        assert isinstance(path1.output_permutation, Permutation)
+        assert isinstance(path2.input_permutation, Permutation)
+        assert isinstance(path2.output_permutation, Permutation)
+        assert isinstance(path3.input_permutation, Permutation)
+        assert path3.output_permutation is None
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+        path3.apply_permutations()
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
     @staticmethod
     def test_empty_path() -> None:
         path = LinearPath()
@@ -161,4 +222,21 @@ class TestLinearPath:
         assert path.output_permutation is None
         path.enforce_identity()
         path.apply_permutations()
+
+
+class TestParallelPaths(PathSource):
+    def test_iter(self) -> None:
+        _, path = self.dense_parallel_path_small()
+        for linpath in path:
+            assert isinstance(linpath, LinearPath)
+
+    def test_len(self) -> None:
+        _, path = self.dense_parallel_path_small()
+        assert len(path) == 3
+
+    def test_getitem(self) -> None:
+        _, path = self.dense_parallel_path_small()
+        assert path[0] == path.paths[0]
+        assert path[1] == path.paths[1]
+        assert path[2] == path.paths[2]
 
