@@ -207,6 +207,15 @@ class TestLinearPath(PathSource):
         y_new = model(x)
         assert allclose(y_orig, y_new)
 
+    def test_shapes(self) -> None:
+        model, path = self.dense_lin_path()
+        assert path.input_shape == 10
+        assert path.output_shape == 10
+
+        model, path = self.conv_lin_path()
+        assert path.input_shape == model[0].weight.shape[1]  # type: ignore[index]
+        assert path.output_shape == model[-1].weight.shape[1]  # type: ignore[index]
+
     @staticmethod
     def test_empty_path() -> None:
         path = LinearPath()
