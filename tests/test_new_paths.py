@@ -146,3 +146,19 @@ class TestLinearPath:
         y_new = conv_model(x)
         assert allclose(y_orig, y_new)
 
+    @staticmethod
+    def test_empty_path() -> None:
+        path = LinearPath()
+        assert len(path) == 0
+        assert not path
+        assert not path.modules
+        assert not path.permutation_to_info
+        assert path.input_permutation is None
+        assert path.output_permutation is None
+        path.input_permutation = torch.randperm(4)
+        assert path.input_permutation is None
+        path.output_permutation = torch.randperm(4)
+        assert path.output_permutation is None
+        path.enforce_identity()
+        path.apply_permutations()
+

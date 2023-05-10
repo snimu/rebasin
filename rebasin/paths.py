@@ -35,10 +35,12 @@ class LinearPath:
     @property
     def input_permutation(self) -> Permutation | None:
         """The permutation of the input to the first module."""
-        return self[0].input_permutation
+        return self[0].input_permutation if bool(self) else None
 
     @input_permutation.setter
     def input_permutation(self, permutation: Permutation | None) -> None:
+        if not bool(self):
+            return
         perm_pt = 0
         self[perm_pt].input_permutation = permutation
 
@@ -54,10 +56,13 @@ class LinearPath:
     @property
     def output_permutation(self) -> Permutation | None:
         """The permutation of the output of the last module."""
-        return self[-1].output_permutation
+        return self[-1].output_permutation if bool(self) else None
 
     @output_permutation.setter
     def output_permutation(self, permutation: Permutation | None) -> None:
+        if not bool(self):
+            return
+
         perm_pt = -1
         self[perm_pt].output_permutation = permutation
 
