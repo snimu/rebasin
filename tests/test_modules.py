@@ -105,6 +105,12 @@ def test_base_module() -> None:
     with pytest.raises(NotImplementedError):
         mb.apply_permutations()
 
+    with pytest.raises(NotImplementedError):
+        _ = mb.input_shape
+
+    with pytest.raises(NotImplementedError):
+        _ = mb.output_shape
+
 
 class TestDefaultModule:
     @staticmethod
@@ -299,6 +305,13 @@ class TestDefaultModule:
             lin_b_orig.weight
         )
 
+    @staticmethod
+    def test_shapes() -> None:
+        lin_a, lin_b = nn.Linear(3, 5), nn.Linear(3, 5)
+        mb = initialize_module(lin_a, lin_b)
+        assert mb.input_shape == lin_a.weight.shape[1]
+        assert mb.output_shape == lin_a.weight.shape[0]
+
 
 class TestOneDimModule:
     @staticmethod
@@ -338,6 +351,13 @@ class TestOneDimModule:
         assert mb.input_permutation is None
         assert mb.output_permutation is None
 
+    @staticmethod
+    def test_shapes() -> None:
+        bn_a, bn_b = nn.BatchNorm2d(4), nn.BatchNorm2d(4)
+        mb = initialize_module(bn_a, bn_b)
+        assert mb.input_shape == bn_a.weight.shape[0]
+        assert mb.output_shape == bn_a.weight.shape[0]
+
 
 class TestLayerNormModule:
     @staticmethod
@@ -374,6 +394,18 @@ class TestLayerNormModule:
         mb.input_permutation = None
         assert mb.input_permutation is None
         assert mb.output_permutation is None
+
+    @staticmethod
+    def test_shapes() -> None:
+        ln_a, ln_b = nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5])
+        mb = initialize_module(ln_a, ln_b)
+        assert mb.input_shape == ln_a.weight.shape[1]
+        assert mb.output_shape == ln_a.weight.shape[1]
+
+        ln_a, ln_b = nn.LayerNorm(3), nn.LayerNorm(3)
+        mb = initialize_module(ln_a, ln_b)
+        assert mb.input_shape == ln_a.weight.shape[0]
+        assert mb.output_shape == ln_a.weight.shape[0]
 
 
 class TestMultiheadAttentionModule:
@@ -489,3 +521,19 @@ class TestMultiheadAttentionModule:
 
         y_new = model(x)
         assert torch.allclose(y_orig, y_new)
+
+    @staticmethod
+    def test_shapes() -> None:
+        embed_dim = 6
+        num_heads = 3
+        mha = nn.MultiheadAttention(embed_dim, num_heads)
+        mb = initialize_module(mha, mha)
+        assert isinstance(mha.in_proj_weight, nn.Parameter)
+        assert mb.input_shape == embed_dim
+        assert mb.output_shape == embed_dim
+
+        mha = nn.MultiheadAttention(embed_dim, num_heads, kdim=4, vdim=5)
+        mb = initialize_module(mha, mha)
+        assert mha.in_proj_weight is None
+        assert mb.input_shape == 0  # Only get input_permutation for in_proj_weight
+        assert mb.output_shape == embed_dim

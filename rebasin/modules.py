@@ -81,11 +81,19 @@ class ModuleBase:
         raise NotImplementedError
 
     @property
+    def input_shape(self) -> int:
+        raise NotImplementedError
+
+    @property
     def output_permutation(self) -> Permutation | None:
         raise NotImplementedError
 
     @output_permutation.setter
     def output_permutation(self, perm: Permutation | None) -> None:
+        raise NotImplementedError
+
+    @property
+    def output_shape(self) -> int:
         raise NotImplementedError
 
     @property
@@ -190,12 +198,20 @@ class DefaultModule(ModuleBase):
         self.axis_to_permutation[1] = perm
 
     @property
+    def input_shape(self) -> int:
+        return self.module_b.weight.shape[1]
+
+    @property
     def output_permutation(self) -> Permutation | None:
         return self.axis_to_permutation[0]
 
     @output_permutation.setter
     def output_permutation(self, perm: Permutation | None) -> None:
         self.axis_to_permutation[0] = perm
+
+    @property
+    def output_shape(self) -> int:
+        return self.module_b.weight.shape[0]
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -268,12 +284,20 @@ class OneDimModule(ModuleBase):
         self._permutation = perm
 
     @property
+    def input_shape(self) -> int:
+        return self.module_b.weight.shape[0]
+
+    @property
     def output_permutation(self) -> Permutation | None:
         return self._permutation
 
     @output_permutation.setter
     def output_permutation(self, perm: Permutation | None) -> None:
         self._permutation = perm
+
+    @property
+    def output_shape(self) -> int:
+        return self.input_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -334,12 +358,24 @@ class LayerNormModule(ModuleBase):
         self._permutation = perm
 
     @property
+    def input_shape(self) -> int:
+        return (
+            self.module_b.weight.shape[0]
+            if len(self.module_b.weight.shape) == 1
+            else self.module_b.weight.shape[1]
+        )
+
+    @property
     def output_permutation(self) -> Permutation | None:
         return self._permutation
 
     @output_permutation.setter
     def output_permutation(self, perm: Permutation | None) -> None:
         self._permutation = perm
+
+    @property
+    def output_shape(self) -> int:
+        return self.input_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -432,6 +468,14 @@ class MultiheadAttentionModule(ModuleBase):
         self._input_permutation = perm
 
     @property
+    def input_shape(self) -> int:
+        return (
+            self.module_b.in_proj_weight.shape[1]
+            if self.module_b.in_proj_weight is not None
+            else 0
+        )
+
+    @property
     def output_permutation(self) -> Permutation | None:
         return self._output_permutation
 
@@ -447,6 +491,10 @@ class MultiheadAttentionModule(ModuleBase):
                 f"output permutation length {len(self._output_permutation)}."
             )
         self._output_permutation = perm
+
+    @property
+    def output_shape(self) -> int:
+        return self.module_b.out_proj.weight.shape[0]
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
