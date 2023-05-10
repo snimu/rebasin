@@ -407,8 +407,6 @@ class LayerNormModule(ModuleBase):
         if except_axis == axis or self._permutation is None:
             return
 
-        print(axis, len(self.module_b.weight.shape), self.module_b.weight.shape)
-
         self.permute_parameter(
             self.module_b.weight,
             axis, self._permutation.perm_indices

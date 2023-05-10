@@ -50,7 +50,7 @@ class PathSource:
         return model, path
 
     @classmethod
-    def dense_parallel_path_small(cls) -> tuple[nn.Module, ParallelPaths]:
+    def dense_parallel_path_with_empty_path(cls) -> tuple[nn.Module, ParallelPaths]:
         mod1, path1 = cls.dense_lin_path()
         mod2, path2 = cls.dense_lin_path()
         mod3, path3 = nn.Sequential(), LinearPath()
@@ -66,6 +66,41 @@ class PathSource:
                 return self.mod1(x) + self.mod2(x) + self.mod3(x)
 
         path = ParallelPaths(path1, path2, path3)
+        return Model(), path
+
+    @classmethod
+    def dense_parallel_path_no_empty_path(cls) -> tuple[nn.Module, ParallelPaths]:
+        mod1, path1 = cls.dense_lin_path()
+        mod2, path2 = cls.dense_lin_path()
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.mod1 = mod1
+                self.mod2 = mod2
+
+            def forward(self, x: torch.Tensor) -> Any:
+                return self.mod1(x) + self.mod2(x)
+
+        path = ParallelPaths(path1, path2)
+        return Model(), path
+
+    @classmethod
+    def dense_parallel_path_diff_shapes(cls) -> tuple[nn.Module, ParallelPaths]:
+        mod1, path1 = cls.dense_lin_path()
+        mod2 = nn.Linear(2, 2)
+        path2 = LinearPath(initialize_module(mod2, mod2))
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.mod1 = mod1
+                self.mod2 = mod2
+
+            def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> Any:
+                return self.mod1(x1), self.mod2(x2)
+
+        path = ParallelPaths(path1, path2)
         return Model(), path
 
 
@@ -235,17 +270,297 @@ class TestLinearPath(PathSource):
 
 class TestParallelPaths(PathSource):
     def test_iter(self) -> None:
-        _, path = self.dense_parallel_path_small()
+        _, path = self.dense_parallel_path_with_empty_path()
         for linpath in path:
             assert isinstance(linpath, LinearPath)
 
     def test_len(self) -> None:
-        _, path = self.dense_parallel_path_small()
+        _, path = self.dense_parallel_path_with_empty_path()
         assert len(path) == 3
 
     def test_getitem(self) -> None:
-        _, path = self.dense_parallel_path_small()
+        _, path = self.dense_parallel_path_with_empty_path()
         assert path[0] == path.paths[0]
         assert path[1] == path.paths[1]
         assert path[2] == path.paths[2]
 
+    def test_input_permutation(self) -> None:
+        _, path = self.dense_parallel_path_with_empty_path()
+        assert path.input_permutation is None
+        path.input_permutation = Permutation(torch.randperm(10))
+        assert isinstance(path.input_permutation, Permutation)
+        path.input_permutation = None
+        assert path.input_permutation is None
+
+        _, path = self.dense_parallel_path_diff_shapes()
+        assert path.input_permutation is None
+        path.input_permutation = Permutation(torch.randperm(10))
+
+        assert path.input_permutation is None
+
+    def test_output_permutation(self) -> None:
+        _, path = self.dense_parallel_path_with_empty_path()
+        assert path.output_permutation is None
+        path.output_permutation = Permutation(torch.randperm(10))
+        assert isinstance(path.output_permutation, Permutation)
+        path.output_permutation = None
+        assert path.output_permutation is None
+
+        _, path = self.dense_parallel_path_diff_shapes()
+        assert path.output_permutation is None
+        path.output_permutation = Permutation(torch.randperm(10))
+        assert path.output_permutation is None
+
+    def test_enforce_identity_between_paths_with_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_with_empty_path()
+        model3, path3 = self.dense_lin_path()
+
+        model = nn.Sequential(model1, model2, model3)
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model3_orig = copy.deepcopy(model3)
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+                path1.permutation_to_info,
+                path2.permutation_to_info,
+                path3.permutation_to_info
+        ):
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+            perm3.perm_indices = torch.randperm(len(perm3.perm_indices))
+
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=path3)
+        path3.enforce_identity(prev_path=path2, next_path=None)
+
+        assert path1.input_permutation is None
+        assert isinstance(path1.output_permutation, Permutation)
+        assert isinstance(path2.input_permutation, Permutation)
+        assert isinstance(path2.output_permutation, Permutation)
+        assert isinstance(path3.input_permutation, Permutation)
+        assert path3.output_permutation is None
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+        path3.apply_permutations()
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model3, model3_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_between_paths_no_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_no_empty_path()
+        model3, path3 = self.dense_lin_path()
+
+        model = nn.Sequential(model1, model2, model3)
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model3_orig = copy.deepcopy(model3)
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+                path1.permutation_to_info,
+                path2.permutation_to_info,
+                path3.permutation_to_info
+        ):
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+            perm3.perm_indices = torch.randperm(len(perm3.perm_indices))
+
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=path3)
+        path3.enforce_identity(prev_path=path2, next_path=None)
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+        path3.apply_permutations()
+
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model3, model3_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_prev_path_none_with_empty_path(self) -> None:
+        model1, path1 = self.dense_parallel_path_with_empty_path()
+        model2, path2 = self.dense_lin_path()
+
+        model = nn.Sequential(model1, model2)
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for (perm1, _), (perm2, _) in zip(  # noqa: B905
+                path1.permutation_to_info,
+                path2.permutation_to_info
+        ):
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=None)
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_prev_path_none_no_empty_path(self) -> None:
+        # Setup
+        model1, path1 = self.dense_parallel_path_no_empty_path()
+        model2, path2 = self.dense_lin_path()
+        model = nn.Sequential(model1, model2)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm1, _ in path1.permutation_to_info:
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+
+        for perm2, _ in path2.permutation_to_info:
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+
+        # Permute
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=None)
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_next_path_none_with_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_with_empty_path()
+        model = nn.Sequential(model1, model2)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm1, _ in path1.permutation_to_info:
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+
+        for perm2, _ in path2.permutation_to_info:
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+
+        # Permute
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=None)
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_next_path_none_no_empty_path(self) -> None:
+        model1, path1 = self.dense_lin_path()
+        model2, path2 = self.dense_parallel_path_no_empty_path()
+        model = nn.Sequential(model1, model2)
+
+        model1_orig = copy.deepcopy(model1)
+        model2_orig = copy.deepcopy(model2)
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        # Randomize permutations
+        for perm1, _ in path1.permutation_to_info:
+            perm1.perm_indices = torch.randperm(len(perm1.perm_indices))
+
+        for perm2, _ in path2.permutation_to_info:
+            perm2.perm_indices = torch.randperm(len(perm2.perm_indices))
+
+        # Permute
+        path1.enforce_identity(prev_path=None, next_path=path2)
+        path2.enforce_identity(prev_path=path1, next_path=None)
+
+        path1.apply_permutations()
+        path2.apply_permutations()
+
+        # Assertions
+        assert model_change_percent(model1, model1_orig) > 0.1
+        assert model_change_percent(model2, model2_orig) > 0.1
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_no_other_paths_with_empty_path(self) -> None:
+        model, path = self.dense_parallel_path_with_empty_path()
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        for perm, _ in path.permutation_to_info:
+            perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+        path.enforce_identity(prev_path=None, next_path=None)
+        path.apply_permutations()
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)
+
+    def test_enforce_identity_no_other_paths_no_empty_path(self) -> None:
+        model, path = self.dense_parallel_path_no_empty_path()
+        model_orig = copy.deepcopy(model)
+        x = torch.randn(10, 10)
+        y_orig = model(x)
+
+        for perm, _ in path.permutation_to_info:
+            perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+        path.enforce_identity(prev_path=None, next_path=None)
+        assert path.input_permutation is None
+        assert path.output_permutation is None
+
+        path.apply_permutations()
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+        assert allclose(y_orig, y_new)

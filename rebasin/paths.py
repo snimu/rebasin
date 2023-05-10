@@ -180,22 +180,60 @@ class ParallelPaths:
         return perms[0]
 
     @input_permutation.setter
-    def input_permutation(self, permutation: Permutation) -> None:
-        shapes = [path.input_shape for path in self if bool(path)]
-        if not all(shape == shapes[0] for shape in shapes):
+    def input_permutation(self, permutation: Permutation | None) -> None:
+        if permutation is None:
+            self._set_all_input_permutations(permutation)
             return
 
+        shapes = [path.input_shape for path in self if bool(path)]
+        if (
+                permutation.perm_indices.shape[0] == shapes[0]
+                and all(shape == shapes[0] for shape in shapes)
+        ):
+            self._set_all_input_permutations(permutation)
+
+    def _set_all_input_permutations(self, permutation: Permutation | None) -> None:
         for path in self:
             path.input_permutation = permutation
 
     @property
     def output_permutation(self) -> Permutation | None:
         """The permutation of the output of the last module."""
-        raise NotImplementedError
+        perms = [path.output_permutation for path in self if bool(path)]
+        if not all(perm is perms[0] for perm in perms):
+            return None
+        return perms[0]
 
     @output_permutation.setter
     def output_permutation(self, permutation: Permutation) -> None:
-        raise NotImplementedError
+        if permutation is None:
+            self._set_all_output_permutations(permutation)
+            return
+
+        shapes = [path.output_shape for path in self if bool(path)]
+        if (
+                permutation.perm_indices.shape[0] == shapes[0]
+                and all(shape == shapes[0] for shape in shapes)
+        ):
+            self._set_all_output_permutations(permutation)
+
+    def _set_all_output_permutations(self, permutation: Permutation | None) -> None:
+        for path in self:
+            path.output_permutation = permutation
+
+    @property
+    def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
+        id_to_perminfo: dict[int, tuple[Permutation, list[PermutationInfo]]] = {}
+
+        for path in self:
+            for permutation, info in path.permutation_to_info:
+                if permutation is None:
+                    continue
+                if id(permutation) not in id_to_perminfo:
+                    id_to_perminfo[id(permutation)] = (permutation, info)
+                id_to_perminfo[id(permutation)][1].extend(info)
+
+        return [perm_info for perm_info in id_to_perminfo.values()]
 
     def enforce_identity(
             self,
@@ -210,33 +248,70 @@ class ParallelPaths:
         changes the layout of the weights and biases of the model, but not
         its output.
         """
-        # Conditions for identity:
-        #   1. Connect parallel paths to previous layer (automatically makes all
-        #      input_permutations the same).
-        #      This has to be done from outside of this model.
-        #   2. If any of the input_permutations are None, make all of them None.
-        #   3. If any of the output_permutations are None, make all of them None.
-        #   4. If any of the input_permutations differ in shape of the relevant axes,
-        #      make all of them None.
-        #   5. If any of the output_permutations differ in shape of the relevant axes,
-        #      make all of them None.
-        #   6. Make all output_permutations the same.
-        #   7. If there is an empty path, make all output_permutations
-        #      equal to the input_permutations (and with that, equal to
-        #      the output permutation of the previous layer.
-        #      This way, the empty path gets the permuted output of the previous layer,
-        #      and the parallel paths also output an equivalently permuted version of
-        #      their original output; the output-permutation of the previous layer is
-        #      compensated via their input_permutations, which is desirable for
-        #      maximum connectivity between the permutations,
-        #      while their output_permutations, by mirroring that of the previous layer,
-        #      make sure that their total effect is equivalent
-        #      to that of the empty path: preserving the output_permutation's effect
-        #      from the previous layer.)
+        for path in self:
+            path.enforce_identity(prev_path=prev_path, next_path=next_path)
+
+        # So far: input_permutation is None if prev_path is None,
+        #   output_permutation is None if next_path is None.
+        # Also, input_permutation is the previous output_permutation
+        #   if prev_path is not None,
+        #   output_permutation is the next input_permutation if next_path is not None.
+        # Next, handle the edge-cases:
+        #
+        # 1. If both prev_path and next_path are None,
+        #       then we are done (input_permutation and output_permutation are None).
+        # 2. If there is no empty path in self,
+        #       then self.output_permutation has to be synchronized
+        #       between the paths in self.
+        #       The may be short paths where the output_permutation
+        #       is the input_permutation, which is None,
+        #       in which case all output_permutations have to be set to None
+        #       Otherwise, either all output_permutations are None,
+        #       in which case setting all to the output_permutation of the first path
+        #       works fine, or none of them are None, in which case it is fine
+        #       to set all output_permutations to any one of the output permutations,
+        #       as long as they are all the same.
+        # 3. If there is an empty path in self, and prev_path is None,
+        #       then output_permutation should also be set to None.
+        # 4. If there is an empty path in self, and next_path is None,
+        #       then input_permutation needs to be None,
+        #       and so does prev_path.output_permutation.
+        # 5. If there is an empty path in self,
+        #       and neither prev_path nor next_path are None,
+        #       then self.output_permutation has to be prev_path.output_permutation.
+
+        # 1. Done
+        if prev_path is None and next_path is None:
+            return
+
+        # No empty path in self
+        if all(bool(path) for path in self):
+            # 2. Synchronize output_permutation
+            if any(path.output_permutation is None for path in self):
+                self.output_permutation = None
+            else:
+                self.output_permutation = self[0].output_permutation
+            return
+
+        # Empty path in self
+        # 3. Set output_permutation to None
+        if prev_path is None:
+            self.output_permutation = None
+            return
+
+        # 4. Set input_permutation and prev_path.output_permutation to None
+        if next_path is None:
+            self.input_permutation = None
+            prev_path.output_permutation = None
+            return
+
+        # 5. Synchronize output_permutation
+        self.output_permutation = prev_path.output_permutation
 
     def apply_permutations(self) -> None:
         """Apply the permutations in the path to the model."""
-        raise NotImplementedError
+        for path in self:
+            path.apply_permutations()
 
 
 class ModelGraph:
