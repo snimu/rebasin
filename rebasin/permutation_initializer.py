@@ -15,10 +15,17 @@ NODE_TYPES = Union[ModuleNode, TensorNode, FunctionNode]
 
 
 class PermutationInitializer:
-    def __init__(self, model_a: nn.Module, model_b: nn.Module, input_data: Any) -> None:
+    def __init__(
+            self,
+            model_a: nn.Module,
+            model_b: nn.Module,
+            input_data_b: Any,
+            input_data_a: Any | None = None,
+    ) -> None:
         self.model_a = model_a
         self.model_b = model_b
-        self.input_data = input_data
+        self.input_data_b = input_data_b
+        self.input_data_a = self.input_data_b if input_data_a is None else input_data_a
 
         self.id_to_module_a = {id(m): m for m in self.model_a.modules()}
         self.id_to_module_b = {id(m): m for m in self.model_b.modules()}
@@ -31,11 +38,11 @@ class PermutationInitializer:
         """
 
         nextnodes_a: list[NODE_TYPES] = list(
-            draw_graph(self.model_a, input_data=self.input_data, depth=1e12)
+            draw_graph(self.model_a, input_data=self.input_data_a, depth=1e12)
             .root_container
         )
         nextnodes_b: list[NODE_TYPES] = list(
-            draw_graph(self.model_b, input_data=self.input_data, depth=1e12)
+            draw_graph(self.model_b, input_data=self.input_data_b, depth=1e12)
             .root_container
         )
 
