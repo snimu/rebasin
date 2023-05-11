@@ -33,6 +33,10 @@ def test_calculate_progress() -> None:
     assert not progress
 
 
+@pytest.mark.skipif(
+    "--full-suite" not in sys.argv,
+    reason="This test takes a long time to run. Run with --full-suite to include it.",
+)
 class TestPermutationCoordinateDescent:
     def test_resnet18(self) -> None:
         self.common_tests(torch.randn(1, 3, 224, 224), resnet18, 1)
@@ -41,8 +45,6 @@ class TestPermutationCoordinateDescent:
         in_features, num_layers = 50, 5
         self.common_tests(torch.randn(50), MLP, 10, in_features, num_layers)
 
-    # TODO: Fix this test
-    @pytest.mark.xfail(reason="Currently has problem, fix later")
     def test_multihead_attention(self) -> None:
         embed_dim = num_heads = 32
         x = torch.randn(embed_dim, num_heads)
@@ -73,7 +75,7 @@ class TestPermutationCoordinateDescent:
         model_b_old = copy.deepcopy(model_b)
 
         x = torch.randn(1, 3, 224, 224)
-        pcd = PermutationCoordinateDescent(model_a, model_b, x, enforce_identity=False)
+        pcd = PermutationCoordinateDescent(model_a, model_b, x)
         pcd.rebasin()
 
         assert not allclose(model_b(x), model_b_old(x))
@@ -92,7 +94,12 @@ class TestPCDOnGPU:
         model_b_old = copy.deepcopy(model_b)
 
         pcd = PermutationCoordinateDescent(
-            model_a, model_b, torch.randn(25), device_a="cpu", device_b=device_b
+            model_a,
+            model_b,
+            input_data_b=torch.randn(25).to(device_b),
+            input_data_a=torch.randn(25),
+            device_a="cpu",
+            device_b=device_b
         )
         pcd.calculate_permutations()
         pcd.apply_permutations()

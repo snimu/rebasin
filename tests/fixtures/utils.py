@@ -3,7 +3,6 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from rebasin._initializer import PermutationInitialization
 from rebasin.structs import ModuleParameters
 
 
@@ -56,12 +55,6 @@ def path_analysis(path: list[ModuleParameters]) -> str:
         pathstr += f"\n\tin: {mp.input_permutation.perm_indices}"
         pathstr += f"\n\tout: {mp.output_permutation.perm_indices}"
     return pathstr
-
-
-def randomize_permutations(initializer: PermutationInitialization) -> None:
-    """Randomize the permutations in :class:`PermutationInitialization`."""
-    for permutation, _ in initializer.perm_to_info:
-        permutation.perm_indices = torch.randperm(len(permutation.perm_indices))
 
 
 def reset_bn_running_stats(model: nn.Module) -> None:
