@@ -664,4 +664,4 @@ class TestModelPath(PathSource):
         assert model_change_percent(model, model_orig) > 0.1
 
         y_new = model(x)
-
+        assert allclose(y_orig, y_new)
