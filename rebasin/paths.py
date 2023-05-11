@@ -109,10 +109,6 @@ class LinearPath:
         changes the layout of the weights and biases of the model, but not
         its output.
         """
-        if len(self) < 2:
-            self.input_permutation = self.output_permutation = None
-            return
-
         if prev_path is None:
             self.input_permutation = None
         else:
