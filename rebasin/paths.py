@@ -141,6 +141,40 @@ class LinearPath:
         for mod in self:
             mod.apply_permutations()
 
+    def __repr__(self) -> str:
+        modules_strings = [
+            f"  {mod.__class__.__name__}("
+            + f"\n    module_type: {mod.module_type.__name__}"
+            + (
+                f"\n    input_shape: {mod.input_shape}"
+                if mod.input_permutation is not None
+                else "\n    input_shape: None"
+            ) + (
+                f"\n    output_shape: {mod.output_shape}"
+                if mod.output_permutation is not None
+                else "\n    output_shape: None"
+            ) + f"\n  )\n\n"
+            for mod in self
+        ]
+
+        if not modules_strings:
+            return "\nLinearPath()\n"
+
+        modules_strings = ["LinearPath(", *modules_strings] + [")"]
+
+        # Normalize line width
+        max_line_width = (
+            max(len(line) for lines in modules_strings for line in lines.splitlines())
+        )
+        for i, lines in enumerate(modules_strings):
+            normalized_lines = [
+                line + " " * (max_line_width - len(line))
+                for line in lines.splitlines()
+            ]
+            modules_strings[i] = "\n" + "\n".join(normalized_lines)
+
+        return "".join(modules_strings)
+
 
 class ParallelPaths:
     """
@@ -313,6 +347,41 @@ class ParallelPaths:
         for path in self:
             path.apply_permutations()
 
+    def __repr__(self) -> str:
+        path_strings = [repr(path) for path in self]
+        max_len = max(
+            len(path_string.splitlines()) for path_string in path_strings)
+
+        for i, path_string in enumerate(path_strings):
+            # Pad the path string with spaces
+            #   so that the parallel paths don't touch.
+            path_strings[i] = "\n".join(
+                line + " "*4
+                for line in path_string.splitlines()
+            )
+
+            # Add "|"-lines to the bottom of the path_string
+            #   to make it as long as the longest path.
+            # The "|" should be padded by spaces such that it is centered
+            #   in a line of length max_width.
+            max_width = max(len(line) for line in path_string.splitlines())
+            centered_line = (
+                    "\n"
+                    + " " * (max_width // 2 - 1)
+                    + "|"
+                    + " " * (max_width // 2 + 3)  # adjust for padding on the right
+            )
+            path_strings[i] += centered_line * (max_len - len(path_string.splitlines()))
+
+        # Join the path strings line-by-line
+        final_path_strings = ["  " for _ in range(max_len)]
+        for path_string in path_strings:
+            for i, line in enumerate(path_string.splitlines()):
+                final_path_strings[i] += line
+
+        return "ParallelPaths(" + "\n".join(final_path_strings) + "\n)"
+
+
 
 class ModelGraph:
     """
@@ -377,3 +446,17 @@ class ModelGraph:
         """Apply the permutations in the paths to the model."""
         for path in self:
             path.apply_permutations()
+
+    def __repr__(self) -> str:
+        reprs: list[str] = []
+        for i, path in enumerate(self):
+            width = max(len(line) for line in repr(path).splitlines())
+            if i > 0:
+                reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
+                reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
+                reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
+            reprs.append("-" * width)
+            reprs.append(repr(path))
+            reprs.append("-" * width)
+
+        return "ModelGraph(\n" + "\n".join(reprs) + "\n)"

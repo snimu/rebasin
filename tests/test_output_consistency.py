@@ -110,6 +110,25 @@ class TestConsistencyLinear:
 
             assert allclose(y_orig, y_new)
 
+    @staticmethod
+    def test_two_layer_control() -> None:
+        lin1 = nn.Linear(8, 10, bias=False)
+        lin2 = nn.Linear(10, 8, bias=False)
+
+        model = nn.Sequential(lin1, lin2)
+        x = torch.randn(8)
+        y_orig = model(x)
+
+        perm1 = torch.tensor([1, 2, 5, 3, 8, 9, 0, 6, 7, 4])
+        perm2 = torch.tensor([4, 7, 2, 6, 0, 3, 1, 9, 5, 8])
+
+        lin1.weight.data = lin1.weight.data[perm1]
+        lin2.weight.data = lin2.weight.data[:, perm2]
+
+        # This shouldn't work if lin1-output_perm != lin2-input_perm
+        y_new = model(x)
+        assert not allclose(y_orig, y_new)
+
 
 class TestConsistencyConv1d:
 
@@ -124,7 +143,6 @@ class TestConsistencyConv1d:
         y_new = conv(x)
 
         assert torch.allclose(y_orig, y_new[:, perm])
-
 
     @staticmethod
     def test_output_perm_multi_layer() -> None:
@@ -218,7 +236,6 @@ class TestConsistencyConv3d:
             y_new = model(x)
 
             assert allclose(y_orig, y_new)
-
 
 
 class TestLayerNorm:
@@ -656,4 +673,3 @@ class TestConsistencyPath:
         y_new = model(x)
 
         assert allclose(y_orig, y_new)
-

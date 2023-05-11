@@ -69,3 +69,12 @@ def reset_bn_running_stats(model: nn.Module) -> None:
     for module in model.modules():
         if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
             module.reset_running_stats()
+
+
+def tensor_diff_perc(
+        y_orig: torch.Tensor | nn.Parameter, y_new: torch.Tensor | nn.Parameter
+) -> float:
+    diff = (y_orig - y_new).abs().sum()
+    base = y_orig.abs().sum()
+    perc = diff / base
+    return perc.item()
