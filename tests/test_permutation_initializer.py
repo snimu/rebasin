@@ -117,8 +117,8 @@ def test_resnet18() -> None:
 @pytest.mark.skipif("--full-suite" not in sys.argv, reason="Compute intense")
 def test_vit_b_16() -> None:
     """Test how it works with modules that have no :class:`nn.BatchNorm2d`."""
-    model_a = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
-    model_b = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
+    model_a = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1)
+    model_b = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1)
     model_b_orig = copy.deepcopy(model_b)
     input_data = torch.randn(1, 3, 224, 224)
     y_orig = model_b(input_data)
@@ -137,5 +137,6 @@ def test_vit_b_16() -> None:
 
     assert tensor_diff_perc(y_new, y_orig) < 1e-5
     assert allclose(y_new, y_orig)
+    assert not allclose(model_a(input_data), model_b(input_data))
 
 
