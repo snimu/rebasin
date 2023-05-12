@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import sys
 from typing import Any
 
+import pytest
 import torch
 from torch import nn
 
@@ -11,7 +13,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     initialize_module,
 )
 from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
-from tests.fixtures.utils import allclose, model_change_percent
+from tests.fixtures.utils import allclose, model_change_percent, tensor_diff_perc
 
 
 class PathSource:
@@ -700,3 +702,86 @@ class TestModelPath(PathSource):
 
         y_new = model(x)
         assert allclose(y_orig, y_new)
+
+
+@pytest.mark.skipif(
+    "--full-suite" not in sys.argv,
+    reason="Long test. Run with --full-suite to include."
+)
+class TestLengtheningModel(PathSource):
+    iters = 100
+
+    def test_par_no_empty_path(self) -> None:
+        constructors = [self.dense_parallel_path_no_empty_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_par_empty_path(self) -> None:
+        constructors = [self.dense_parallel_path_with_empty_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_lin__par_no_empty_path(self) -> None:
+        constructors = [self.dense_lin_path, self.dense_parallel_path_no_empty_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_lin__par_empty_path(self) -> None:
+        constructors = [self.dense_lin_path, self.dense_parallel_path_with_empty_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_par_no_empty_path__lin(self) -> None:
+        constructors = [self.dense_parallel_path_no_empty_path, self.dense_lin_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_par_empty_path__lin(self) -> None:
+        constructors = [self.dense_parallel_path_with_empty_path, self.dense_lin_path]
+        self.print_lengthening_model(constructors, self.iters)
+
+    def test_par_empty_path__par_no_empty_path(self) -> None:
+        constructors = [
+            self.dense_parallel_path_with_empty_path,
+            self.dense_parallel_path_no_empty_path
+        ]
+        self.print_lengthening_model(constructors, self.iters)
+
+    @staticmethod
+    def print_lengthening_model(constructors: list[Any], iters: int) -> None:
+        model = nn.Sequential()
+        paths: list[ParallelPaths | LinearPath] = []
+        x = torch.randn(10, 10)
+
+        diffs: list[float] = []
+
+        for _ in range(iters):
+            for constructor in constructors:
+                model_n, path_n = constructor()
+                model.append(model_n)
+                paths.append(path_n)
+            graph = ModelGraph(*paths)
+            model_orig = copy.deepcopy(model)
+
+            y_orig = model(x)
+
+            # Randomize permutations
+            for perm, _ in graph.permutation_to_info:
+                perm.perm_indices = torch.randperm(len(perm.perm_indices))
+
+            # Permute
+            graph.enforce_identity()
+            graph.apply_permutations()
+
+            # Assertions
+            assert model_change_percent(model, model_orig) > 0.1
+
+            y_new = model(x)
+            diffs.append(tensor_diff_perc(y_new, y_orig))
+            assert allclose(y_orig, y_new)
+
+        print(
+            f"\nAverage difference: "
+            f"{sum(diffs) / len(diffs)}. "
+            f"\nFirst difference: "
+            f"{diffs[0]}. "
+            f"\nLast difference: "
+            f"{diffs[-1]}."
+        )
+
+        raise AssertionError()

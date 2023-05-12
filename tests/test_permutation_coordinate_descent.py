@@ -12,7 +12,12 @@ from torchvision.models import resnet18  # type: ignore[import]
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
 from tests.fixtures.models import MLP
-from tests.fixtures.utils import allclose, model_distance, model_similarity
+from tests.fixtures.utils import (
+    allclose,
+    model_change_percent,
+    model_distance,
+    model_similarity,
+)
 
 
 def test_calculate_progress() -> None:
@@ -31,6 +36,28 @@ def test_calculate_progress() -> None:
     progress = calculate_progress(cost_mat, perm_old, perm_new)
 
     assert not progress
+
+
+def test_long_mlp() -> None:
+    """Test that :class:`PermutationCoordinateDescent`
+    can handle a linear network with 100 layers
+    (each with a 10x10 weight matrix).
+
+    Handle means that it can permute the weights s.t. the output doesn't change.
+    """
+    model_a, model_b = MLP(10, 100), MLP(10, 100)
+    model_b_orig = copy.deepcopy(model_b)
+    input_data = torch.randn(10)
+    y_orig = model_b(input_data)
+
+    pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
+    pcd.calculate_permutations()
+    pcd.apply_permutations()
+
+    assert model_change_percent(model_b, model_b_orig) > 0.1
+
+    y_new = model_b(input_data)
+    assert torch.allclose(y_orig, y_new)
 
 
 @pytest.mark.skipif(
