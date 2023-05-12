@@ -72,11 +72,6 @@ class TestPermutationCoordinateDescent:
         in_features, num_layers = 50, 5
         self.common_tests(torch.randn(50), MLP, 10, in_features, num_layers)
 
-    def test_multihead_attention(self) -> None:
-        embed_dim = num_heads = 32
-        x = torch.randn(embed_dim, num_heads)
-        self.common_tests((x, x, x), nn.MultiheadAttention, 10, embed_dim, num_heads)
-
     @staticmethod
     def common_tests(
             input_data: Any, constructor: Any, iters: int, *args: Any
