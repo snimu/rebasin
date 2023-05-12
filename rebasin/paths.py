@@ -378,7 +378,6 @@ class ParallelPaths:
         return "ParallelPaths(" + "\n".join(final_path_strings) + "\n)"
 
 
-
 class ModelGraph:
     """
     The graph of the model.
