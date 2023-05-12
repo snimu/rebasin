@@ -10,7 +10,7 @@ def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:
     """Calculate the distance between two models."""
     total_dist = 0.0
 
-    for parameter_a, parameter_b in zip(  # noqa
+    for parameter_a, parameter_b in zip(
             model_a.parameters(), model_b.parameters()
     ):
         p_a, p_b = parameter_a.reshape(-1), parameter_b.reshape(-1)
@@ -22,7 +22,7 @@ def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:
 def model_distance(model_a: nn.Module, model_b: nn.Module) -> float:
     dist = 0.0
 
-    for pa, pb in zip(model_a.parameters(), model_b.parameters()):  # noqa: B905
+    for pa, pb in zip(model_a.parameters(), model_b.parameters()):
         dist += (pa - pb).abs().sum().item()
 
     return dist
@@ -41,7 +41,7 @@ def allclose(a: torch.Tensor, b: torch.Tensor) -> bool:
 def model_change_percent(model1: nn.Module, model2: nn.Module) -> float:
     diff = 0.0
     base = 0.0
-    for p1, p2 in zip(model1.parameters(), model2.parameters()):  # noqa: B905
+    for p1, p2 in zip(model1.parameters(), model2.parameters()):
         diff += torch.sum(torch.abs(p1 - p2)).item()
         base += torch.sum(torch.abs(p2)).item()
     return diff / base
@@ -60,7 +60,7 @@ def path_analysis(path: list[ModuleParameters]) -> str:
 def reset_bn_running_stats(model: nn.Module) -> None:
     """Reset the running statistics of all batch norm modules in the model."""
     for module in model.modules():
-        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+        if isinstance(module, nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d):
             module.reset_running_stats()
 
 

@@ -244,7 +244,7 @@ def read_csv(file: str) -> dict[str, list[Any]]:
         header = next(reader)
         data: dict[str, list[str | float | int]] = {h: [] for h in header}
         for row in reader:
-            for h, v in zip(header, row):  # noqa: B905
+            for h, v in zip(header, row):
                 data[h].append(float(v))
 
     return data

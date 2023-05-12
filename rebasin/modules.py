@@ -156,11 +156,11 @@ class DefaultModule(ModuleBase):
             raise TypeError(
                 f"Module weight is not a parameter: {type(self.module_b.weight)}"
             )
-        if not isinstance(self.module_a.bias, (nn.Parameter, type(None))):
+        if not isinstance(self.module_a.bias, nn.Parameter | type(None)):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_a.bias)}"
             )
-        if not isinstance(self.module_b.bias, (nn.Parameter, type(None))):
+        if not isinstance(self.module_b.bias, nn.Parameter | type(None)):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_b.bias)}"
             )

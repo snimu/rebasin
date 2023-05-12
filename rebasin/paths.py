@@ -48,7 +48,7 @@ class LinearPath:
         # meaning that they have to be connected.
         while (
             perm_pt < len(self) - 1
-            and isinstance(self[perm_pt], (OneDimModule, LayerNormModule))
+            and isinstance(self[perm_pt], OneDimModule | LayerNormModule)
         ):
             self[perm_pt + 1].input_permutation = permutation
             perm_pt += 1
@@ -72,7 +72,7 @@ class LinearPath:
 
         while(
             perm_pt > -len(self)
-            and isinstance(self[perm_pt], (OneDimModule, LayerNormModule))
+            and isinstance(self[perm_pt], OneDimModule | LayerNormModule)
         ):
             self[perm_pt].input_permutation = permutation
             self[perm_pt - 1].output_permutation = permutation
@@ -388,7 +388,7 @@ class ModelGraph:
     def __init__(self, *paths: LinearPath | ParallelPaths) -> None:
         self.paths = list(paths)
         assert all(
-            isinstance(path, (LinearPath, ParallelPaths))
+            isinstance(path, LinearPath | ParallelPaths)
             for path in self.paths
         ), "paths must be instances of LinearPath or ParallelPaths"
 

@@ -116,7 +116,7 @@ class PermutationInitializer:
         prev_final_nodes_a: list[NODE_TYPES] = []
         prev_final_nodes_b: list[NODE_TYPES] = []
 
-        for node_a, node_b in zip(nextnodes_a, nextnodes_b):  # noqa: B905
+        for node_a, node_b in zip(nextnodes_a, nextnodes_b):
             path, finalnodes_a, finalnodes_b = self.initialize_linear_path(
                 [node_a], [node_b]
             )

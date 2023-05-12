@@ -156,7 +156,7 @@ class Interpolation:
         self.metrics_models = [
             self.eval_fn(m, d)
             for m, d in tqdm(
-                zip(self.models, self.devices), disable=not self.verbose  # noqa: B905
+                zip(self.models, self.devices), disable=not self.verbose
             )
         ]
         if self.verbose:
@@ -197,22 +197,22 @@ class Interpolation:
         assert isinstance(eval_mode, str)
         assert eval_mode in ["min", "max"], "Eval mode must be 'min' or 'max'"
 
-        assert isinstance(train_dataloader, (DataLoader, type(None)))
+        assert isinstance(train_dataloader, DataLoader | type(None))
 
         if devices is not None:
             assert isinstance(devices, Sequence)
             assert all(
-                isinstance(device, (str, torch.device)) for device in devices
+                isinstance(device, str | torch.device) for device in devices
             )
             assert len(devices) == len(models)
 
-        assert isinstance(device_interp, (str, torch.device, type(None)))
+        assert isinstance(device_interp, str | torch.device | type(None))
 
-        assert isinstance(input_indices, (int, Sequence))
+        assert isinstance(input_indices, int | Sequence)
         if isinstance(input_indices, Sequence):
             assert all(isinstance(i, int) for i in input_indices)
 
-        assert isinstance(savedir, (Path, str, type(None)))
+        assert isinstance(savedir, Path | str | type(None))
         assert isinstance(save_all, bool)
 
         assert len(models) > 1, "Need at least two models to interpolate between"
@@ -380,7 +380,7 @@ class LerpSimple(Interpolation):
                 if not None.
         """
         # SANITY CHECKS AND DEFAULT SETTINGS
-        assert isinstance(savedir, (Path, str, type(None)))
+        assert isinstance(savedir, Path | str | type(None))
         if savedir is None:
             savedir = self.savedir
         elif isinstance(savedir, str):
@@ -425,11 +425,11 @@ class LerpSimple(Interpolation):
     ) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
-                zip(self.models[:-1], self.models[1:])  # noqa: B905
+                zip(self.models[:-1], self.models[1:])
         ):
             model_interp = copy.deepcopy(model1).to(self.device_interp)
 
-            for param1, param2, param_interp in zip(  # noqa: B905
+            for param1, param2, param_interp in zip(
                     model1.parameters(),
                     model2.parameters(),
                     model_interp.parameters(),

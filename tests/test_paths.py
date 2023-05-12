@@ -214,7 +214,7 @@ class TestLinearPath(PathSource):
         y_orig = model(x)
 
         # Randomize permutations
-        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+        for (perm1, _), (perm2, _), (perm3, _) in zip(
                 path1.permutation_to_info,
                 path2.permutation_to_info,
                 path3.permutation_to_info
@@ -325,7 +325,7 @@ class TestParallelPaths(PathSource):
         y_orig = model(x)
 
         # Randomize permutations
-        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+        for (perm1, _), (perm2, _), (perm3, _) in zip(
                 path1.permutation_to_info,
                 path2.permutation_to_info,
                 path3.permutation_to_info
@@ -370,7 +370,7 @@ class TestParallelPaths(PathSource):
         y_orig = model(x)
 
         # Randomize permutations
-        for (perm1, _), (perm2, _), (perm3, _) in zip(  # noqa: B905
+        for (perm1, _), (perm2, _), (perm3, _) in zip(
                 path1.permutation_to_info,
                 path2.permutation_to_info,
                 path3.permutation_to_info
@@ -407,7 +407,7 @@ class TestParallelPaths(PathSource):
         y_orig = model(x)
 
         # Randomize permutations
-        for (perm1, _), (perm2, _) in zip(  # noqa: B905
+        for (perm1, _), (perm2, _) in zip(
                 path1.permutation_to_info,
                 path2.permutation_to_info
         ):

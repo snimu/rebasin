@@ -247,9 +247,9 @@ class TorchvisionEval:
         ]
 
         i = 1
-        for l1, (l2, l3) in zip(  # noqa
+        for l1, (l2, l3) in zip(
                 results["a_b_original"],
-                zip(results["a_b_rebasin"], results["b_original_b_rebasin"])  # noqa
+                zip(results["a_b_rebasin"], results["b_original_b_rebasin"])
         ):
             rows.append([f"interpolated_{i}", l1, l2, l3])
             i += 1

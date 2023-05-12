@@ -84,7 +84,7 @@ class ModuleGenerator:
             in_channels, out_channels, kernel_size, bias=bias, padding=padding
         )
         bias_ = conv2d.bias if bias else None
-        assert isinstance(bias_, (nn.Parameter, type(None)))  # for mypy
+        assert isinstance(bias_, nn.Parameter | type(None))  # for mypy
 
         conv2d_mp = ModuleParameters(
             weight_a=conv2d.weight,
