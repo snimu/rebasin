@@ -136,6 +136,7 @@ class PermutationCoordinateDescent:
         self.pinit = PermutationInitializer(
             model_a, model_b, input_data_b, input_data_a
         )
+        self.pinit.model_graph.enforce_identity()
 
         if verbose:
             print("Done.")
