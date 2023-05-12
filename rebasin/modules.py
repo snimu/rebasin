@@ -12,6 +12,7 @@ from typing import Any, Union
 
 import torch
 from torch import nn
+from torchview import ModuleNode
 
 
 @dataclass
@@ -61,7 +62,12 @@ class ModuleBase:
     The base class for all modules.
     """
 
-    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
+    def __init__(
+            self,
+            module_a: nn.Module,
+            module_b: nn.Module,
+            module_node_b: ModuleNode,
+    ) -> None:
         if not type(module_a) == type(module_b):
             raise TypeError(
                 f"Module types do not match: {type(module_a)} vs {type(module_b)}"
@@ -71,6 +77,8 @@ class ModuleBase:
         self.module_a = module_a
         self.module_b = module_b
         self.module_type = type(module_a)
+        self._input_shape = module_node_b.input_shape
+        self._output_shape = module_node_b.output_shape
 
     @property
     def input_permutation(self) -> Permutation | None:
@@ -81,8 +89,12 @@ class ModuleBase:
         raise NotImplementedError
 
     @property
-    def input_shape(self) -> int:
+    def input_permutation_shape(self) -> int:
         raise NotImplementedError
+
+    @property
+    def input_shape(self) -> list[tuple[int, ...]]:
+        return self._input_shape
 
     @property
     def output_permutation(self) -> Permutation | None:
@@ -93,8 +105,12 @@ class ModuleBase:
         raise NotImplementedError
 
     @property
-    def output_shape(self) -> int:
+    def output_permutation_shape(self) -> int:
         raise NotImplementedError
+
+    @property
+    def output_shape(self) -> list[tuple[int, ...]]:
+        return self._output_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -136,8 +152,13 @@ class DefaultModule(ModuleBase):
     Not used for, e.g., :class:`nn.MultiheadAttention`.
     """
 
-    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
-        super().__init__(module_a, module_b)
+    def __init__(
+            self,
+            module_a: nn.Module,
+            module_b: nn.Module,
+            module_node_b: ModuleNode,
+    ) -> None:
+        super().__init__(module_a, module_b, module_node_b)
 
         if not hasattr(self.module_a, "weight"):
             raise AttributeError(f"Module has no weight: {type(self.module_a)}")
@@ -198,7 +219,7 @@ class DefaultModule(ModuleBase):
         self.axis_to_permutation[1] = perm
 
     @property
-    def input_shape(self) -> int:
+    def input_permutation_shape(self) -> int:
         return self.module_b.weight.shape[1]
 
     @property
@@ -210,7 +231,7 @@ class DefaultModule(ModuleBase):
         self.axis_to_permutation[0] = perm
 
     @property
-    def output_shape(self) -> int:
+    def output_permutation_shape(self) -> int:
         return self.module_b.weight.shape[0]
 
     @property
@@ -270,8 +291,13 @@ class OneDimModule(ModuleBase):
     """For Modules with a 1D :code:`weight` (and :code:`bias`) attribute.
     """
 
-    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
-        super().__init__(module_a, module_b)
+    def __init__(
+            self,
+            module_a: nn.Module,
+            module_b: nn.Module,
+            module_node_b: ModuleNode,
+    ) -> None:
+        super().__init__(module_a, module_b, module_node_b)
 
         self._permutation = Permutation(torch.arange(module_b.weight.shape[0]))
 
@@ -284,7 +310,7 @@ class OneDimModule(ModuleBase):
         self._permutation = perm
 
     @property
-    def input_shape(self) -> int:
+    def input_permutation_shape(self) -> int:
         return self.module_b.weight.shape[0]
 
     @property
@@ -296,8 +322,8 @@ class OneDimModule(ModuleBase):
         self._permutation = perm
 
     @property
-    def output_shape(self) -> int:
-        return self.input_shape
+    def output_permutation_shape(self) -> int:
+        return self.input_permutation_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -341,8 +367,13 @@ class OneDimModule(ModuleBase):
 class LayerNormModule(ModuleBase):
     """A module for :class:`nn.LayerNorm`."""
 
-    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
-        super().__init__(module_a, module_b)
+    def __init__(
+            self,
+            module_a: nn.Module,
+            module_b: nn.Module,
+            module_node_b: ModuleNode,
+    ) -> None:
+        super().__init__(module_a, module_b, module_node_b)
         self._permutation = (
             Permutation(torch.arange(module_b.weight.shape[0]))
             if len(module_b.weight.shape) == 1
@@ -358,7 +389,7 @@ class LayerNormModule(ModuleBase):
         self._permutation = perm
 
     @property
-    def input_shape(self) -> int:
+    def input_permutation_shape(self) -> int:
         return (
             self.module_b.weight.shape[0]
             if len(self.module_b.weight.shape) == 1
@@ -374,8 +405,8 @@ class LayerNormModule(ModuleBase):
         self._permutation = perm
 
     @property
-    def output_shape(self) -> int:
-        return self.input_shape
+    def output_permutation_shape(self) -> int:
+        return self.input_permutation_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -425,8 +456,14 @@ class MultiheadAttentionModule(ModuleBase):
     """
     A module for :class:`nn.MultiheadAttention`.
     """
-    def __init__(self, module_a: nn.Module, module_b: nn.Module) -> None:
-        super().__init__(module_a, module_b)
+
+    def __init__(
+            self,
+            module_a: nn.Module,
+            module_b: nn.Module,
+            module_node_b: ModuleNode,
+    ) -> None:
+        super().__init__(module_a, module_b, module_node_b)
 
         if not isinstance(module_a, nn.MultiheadAttention):
             raise TypeError(
@@ -444,6 +481,8 @@ class MultiheadAttentionModule(ModuleBase):
         self._output_permutation: Permutation | None = Permutation(
             torch.arange(module_b.out_proj.weight.shape[0])
         )
+
+        self._input_shape = self.input_shape[0]
 
     @property
     def input_permutation(self) -> Permutation | None:
@@ -466,7 +505,7 @@ class MultiheadAttentionModule(ModuleBase):
         self._input_permutation = perm
 
     @property
-    def input_shape(self) -> int:
+    def input_permutation_shape(self) -> int:
         return (
             self.module_b.in_proj_weight.shape[1]
             if self.module_b.in_proj_weight is not None
@@ -491,7 +530,7 @@ class MultiheadAttentionModule(ModuleBase):
         self._output_permutation = perm
 
     @property
-    def output_shape(self) -> int:
+    def output_permutation_shape(self) -> int:
         return self.module_b.out_proj.weight.shape[0]
 
     @property
@@ -580,24 +619,27 @@ SPECIAL_MODULES: dict[Any, MODULE_CONSTRUCTOR_TYPES] = {
 }
 
 
-def initialize_module(module_a: nn.Module, module_b: nn.Module) -> MODULE_TYPES | None:
+def initialize_module(
+        module_a: nn.Module, module_b: nn.Module, module_node_b: ModuleNode
+) -> MODULE_TYPES | None:
     """
     Initialize a child of :class:`ModuleBase` for a given module pair.
 
     :param module_a: The :class:`nn.Module` from model_a.
     :param module_b: The corresponding :class:`nn.Module` from module_b.
+    :param module_node_b: The :class:`ModuleNode` correspoinding to module_b.
     :return: The correct child class of :class:`ModuleBase` for the given module pair,
     initialized with the given modules, if the type of the Module supports permutation,
     otherwise None.
     """
     if type(module_a) in SPECIAL_MODULES:
-        return SPECIAL_MODULES[type(module_a)](module_a, module_b)
+        return SPECIAL_MODULES[type(module_a)](module_a, module_b, module_node_b)
 
     if hasattr(module_b, "weight") and hasattr(module_a, "weight"):
         return (
-            OneDimModule(module_a, module_b)
+            OneDimModule(module_a, module_b, module_node_b)
             if len(module_b.weight.shape) == 1
-            else DefaultModule(module_a, module_b)
+            else DefaultModule(module_a, module_b, module_node_b)
         )
 
     return None

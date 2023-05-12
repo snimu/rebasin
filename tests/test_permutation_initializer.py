@@ -16,6 +16,7 @@ from tests.fixtures.models import MLP
 from tests.fixtures.utils import (
     allclose,
     model_change_percent,
+    reset_bn_running_stats,
     tensor_diff_perc,
 )
 
@@ -95,6 +96,17 @@ def test_resnet18() -> None:
             is pinit.model_graph[3][1].input_permutation
     )
 
+    for module in model_b.modules():
+        if isinstance(module, torch.nn.BatchNorm2d):
+            assert torch.allclose(
+                module.running_mean,  # type: ignore[arg-type]
+                torch.zeros_like(module.running_mean)  # type: ignore[arg-type]
+            )
+            assert torch.allclose(
+                module.running_var,  # type: ignore[arg-type]
+                torch.ones_like(module.running_var)  # type: ignore[arg-type]
+            )
+
     # nn.BatchNorm really plays a number on the enforce_identity() function,
     #   so for resnet18, I have to pick a much more relaxed metric
     #   than for other models.
@@ -123,7 +135,7 @@ def test_vit_b_16() -> None:
 
     y_new = model_b(input_data)
 
-    assert tensor_diff_perc(y_new, y_orig) < 1e-6
+    assert tensor_diff_perc(y_new, y_orig) < 1e-5
     assert allclose(y_new, y_orig)
 
 

@@ -10,8 +10,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     initialize_module,
 )
 from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
-
-NODE_TYPES = Union[ModuleNode, TensorNode, FunctionNode]
+from rebasin.type_definitions import NODE_TYPES
 
 
 class PermutationInitializer:
@@ -87,7 +86,7 @@ class PermutationInitializer:
             if isinstance(node_a, ModuleNode) and isinstance(node_b, ModuleNode):
                 mod_a = self.id_to_module_a[node_a.compute_unit_id]
                 mod_b = self.id_to_module_b[node_b.compute_unit_id]
-                module = initialize_module(mod_a, mod_b)
+                module = initialize_module(mod_a, mod_b, node_b)
                 if module is not None:
                     modules.append(module)
 

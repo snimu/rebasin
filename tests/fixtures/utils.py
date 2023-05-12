@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import torch
 from torch import nn
+from torchview import ModuleNode, draw_graph
 
 from rebasin.structs import ModuleParameters
+from rebasin.type_definitions import NODE_TYPES
 
 
 def model_similarity(model_a: nn.Module, model_b: nn.Module) -> float:
@@ -71,3 +75,19 @@ def tensor_diff_perc(
     base = y_orig.abs().sum()
     perc = diff / base
     return perc.item()
+
+
+def modules_and_module_nodes(
+        module_a: nn.Module,
+        module_b: nn.Module,
+        x: torch.Tensor | Sequence[torch.Tensor]
+) -> tuple[nn.Module, nn.Module, ModuleNode]:
+    nodes: list[NODE_TYPES] = list(
+        draw_graph(module_b, input_data=x, depth=1e12).root_container
+    )
+    while nodes and not isinstance(nodes[0], ModuleNode):
+        nodes = list(nodes[0].children)  # type: ignore[arg-type]
+
+    node: ModuleNode = nodes[0]  # type: ignore[assignment]
+    assert isinstance(node, ModuleNode)
+    return module_a, module_b, node

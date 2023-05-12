@@ -23,7 +23,7 @@ from rebasin.modules import (
     PermutationInfo,
     initialize_module,
 )
-from tests.fixtures.utils import model_change_percent
+from tests.fixtures.utils import model_change_percent, modules_and_module_nodes
 
 
 class TestPermutation:
@@ -44,8 +44,10 @@ class TestPermutation:
 class TestPermutationInfo:
     @staticmethod
     def test_eq() -> None:
-        lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
-        module = ModuleBase(lin_a, lin_b)
+        lin_a, lin_b, node = modules_and_module_nodes(
+            nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+        )
+        module = ModuleBase(lin_a, lin_b, node)
         permutation_info = PermutationInfo(
             module=module,
             axis=0,
@@ -81,12 +83,23 @@ class TestPermutationInfo:
 
 def test_base_module() -> None:
     with pytest.raises(TypeError):
-        ModuleBase(nn.Linear(5, 5), nn.Conv2d(5, 5, 3))
+        ModuleBase(
+            *modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Conv2d(5, 5, 3), torch.randn(1, 5, 15, 15)
+            )
+        )
 
     with pytest.raises(TypeError):
-        ModuleBase("foo", "bar")
+        _, _, node = modules_and_module_nodes(
+            nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+        )
+        ModuleBase("foo", "bar", node)
 
-    mb = ModuleBase(nn.Linear(5, 5), nn.Linear(5, 5))
+    mb = ModuleBase(
+        *modules_and_module_nodes(
+            nn.Conv2d(5, 5, 3), nn.Conv2d(5, 5, 3), torch.randn(1, 5, 15, 15)
+        )
+    )
     with pytest.raises(NotImplementedError):
         _ = mb.input_permutation
 
@@ -106,67 +119,96 @@ def test_base_module() -> None:
         mb.apply_permutations()
 
     with pytest.raises(NotImplementedError):
-        _ = mb.input_shape
+        _ = mb.input_permutation_shape
 
     with pytest.raises(NotImplementedError):
-        _ = mb.output_shape
+        _ = mb.output_permutation_shape
 
 
 class TestDefaultModule:
     @staticmethod
     def test_sanity_checks() -> None:
         with pytest.raises(AttributeError):
-            DefaultModule(nn.MultiheadAttention(5, 5), nn.MultiheadAttention(5, 5))
+            m1, m2, node = modules_and_module_nodes(
+                nn.MultiheadAttention(5, 5),
+                nn.MultiheadAttention(5, 5),
+                (torch.randn(5, 5), torch.randn(5, 5), torch.randn(5, 5))
+            )
+            DefaultModule(m1, m2, node)
 
         with pytest.raises(AttributeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             del lin_b.weight
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(AttributeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             del lin_a.bias
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(AttributeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             del lin_b.bias
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(ValueError):
-            DefaultModule(nn.Linear(5, 3), nn.Linear(5, 5))
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 3), nn.Linear(5, 5), torch.randn(5)
+            )
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(ValueError):
-            DefaultModule(nn.Linear(5, 5), nn.Linear(5, 5, bias=False))
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5, bias=False), torch.randn(5)
+            )
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(ValueError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             lin_b.bias = nn.Parameter(torch.zeros(3))
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(TypeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             lin_a.weight = nn.Linear(5, 5)
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(TypeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             lin_b.weight = nn.Linear(5, 5)
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(TypeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             lin_a.bias = nn.Linear(5, 5)
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(TypeError):
-            lin_a, lin_b = nn.Linear(5, 5), nn.Linear(5, 5)
+            lin_a, lin_b, node = modules_and_module_nodes(
+                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
+            )
             lin_b.bias = nn.Linear(5, 5)
-            DefaultModule(lin_a, lin_b)
+            DefaultModule(lin_a, lin_b, node)
 
     @staticmethod
     def test_io_permutations() -> None:
-        mb = initialize_module(nn.Linear(3, 5), nn.Linear(3, 5))
+        mb = initialize_module(
+            *modules_and_module_nodes(nn.Linear(3, 5), nn.Linear(3, 5), torch.randn(3))
+        )
         assert mb.input_permutation == Permutation(torch.arange(3))
         assert mb.output_permutation == Permutation(torch.arange(5))
 
@@ -178,7 +220,9 @@ class TestDefaultModule:
 
     @staticmethod
     def test_permutation_to_info() -> None:
-        mb = initialize_module(nn.Linear(3, 5), nn.Linear(3, 5))
+        mb = initialize_module(
+            *modules_and_module_nodes(nn.Linear(3, 5), nn.Linear(3, 5), torch.randn(3))
+        )
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
         mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0]))
 
@@ -197,7 +241,11 @@ class TestDefaultModule:
             )
         ]
 
-        mb = initialize_module(nn.Linear(3, 5, bias=False), nn.Linear(3, 5, bias=False))
+        mb = initialize_module(
+            *modules_and_module_nodes(
+                nn.Linear(3, 5, bias=False), nn.Linear(3, 5, bias=False), torch.randn(3)
+            )
+        )
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
         mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0]))
 
@@ -214,7 +262,10 @@ class TestDefaultModule:
         ]
 
         # What if the input-and output-Permutation is the same?
-        mb = initialize_module(nn.Linear(5, 5), nn.Linear(5, 5))
+
+        mb = initialize_module(
+            *modules_and_module_nodes(nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5))
+        )
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4]))
         mb.output_permutation = mb.input_permutation
 
@@ -232,9 +283,11 @@ class TestDefaultModule:
 
     @staticmethod
     def test_apply_permutations() -> None:
-        lin_a, lin_b = nn.Linear(3, 5), nn.Linear(3, 5)
+        lin_a, lin_b, node = modules_and_module_nodes(
+            nn.Linear(3, 5), nn.Linear(3, 5), torch.randn(3)
+        )
         lin_b_orig = copy.deepcopy(lin_b)
-        mb = initialize_module(lin_a, lin_b)
+        mb = initialize_module(lin_a, lin_b, node)
 
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
         mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0]))
@@ -278,9 +331,11 @@ class TestDefaultModule:
 
     @staticmethod
     def test_none_permuation() -> None:
-        lin_a, lin_b = nn.Linear(3, 5), nn.Linear(3, 5)
+        lin_a, lin_b, node = modules_and_module_nodes(
+            nn.Linear(3, 5), nn.Linear(3, 5), torch.randn(3)
+        )
         lin_b_orig = copy.deepcopy(lin_b)
-        mb = initialize_module(lin_a, lin_b)
+        mb = initialize_module(lin_a, lin_b, node)
         mb.input_permutation = None
         mb.output_permutation = None
 
@@ -307,33 +362,41 @@ class TestDefaultModule:
 
     @staticmethod
     def test_shapes() -> None:
-        lin_a, lin_b = nn.Linear(3, 5), nn.Linear(3, 5)
-        mb = initialize_module(lin_a, lin_b)
-        assert mb.input_shape == lin_a.weight.shape[1]
-        assert mb.output_shape == lin_a.weight.shape[0]
+        lin_a, lin_b, node = modules_and_module_nodes(
+            nn.Linear(3, 5), nn.Linear(3, 5), torch.randn(3)
+        )
+        mb = initialize_module(lin_a, lin_b, node)
+        assert mb.input_permutation_shape == lin_a.weight.shape[1]
+        assert mb.output_permutation_shape == lin_a.weight.shape[0]
 
 
 class TestOneDimModule:
     @staticmethod
     def test_io_permutations() -> None:
-        mb = initialize_module(nn.BatchNorm2d(4), nn.BatchNorm2d(4))
+        mb = initialize_module(
+            *modules_and_module_nodes(
+                nn.BatchNorm2d(3), nn.BatchNorm2d(3), torch.randn(1, 3, 12, 12)
+            )
+        )
         assert isinstance(mb, OneDimModule)
-        assert mb.input_permutation == Permutation(torch.arange(4))
+        assert mb.input_permutation == Permutation(torch.arange(3))
         assert mb.input_permutation is mb.output_permutation
 
-        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
-        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
+        assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1]))
 
     @staticmethod
     def test_apply_permutations() -> None:
-        bn_a, bn_b = nn.BatchNorm2d(4), nn.BatchNorm2d(4)
+        bn_a, bn_b, node = modules_and_module_nodes(
+            nn.BatchNorm2d(3), nn.BatchNorm2d(3), torch.randn(1, 3, 12, 12)
+        )
         bn_b.weight.data = torch.randn_like(bn_b.weight.data)
         bn_b.bias.data = torch.randn_like(bn_b.bias.data)
         bn_b_orig = copy.deepcopy(bn_b)
 
-        mb = initialize_module(bn_a, bn_b)
+        mb = initialize_module(bn_a, bn_b, node)
 
-        mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
+        mb.input_permutation = Permutation(torch.tensor([2, 0, 1]))
         assert mb.output_permutation is mb.input_permutation
         mb.apply_permutations()
 
@@ -342,9 +405,13 @@ class TestOneDimModule:
 
     @staticmethod
     def test_none_permutation() -> None:
-        mb = initialize_module(nn.BatchNorm2d(4), nn.BatchNorm2d(4))
+        mb = initialize_module(
+            *modules_and_module_nodes(
+                nn.BatchNorm2d(3), nn.BatchNorm2d(3), torch.randn(1, 3, 12, 12)
+            )
+        )
         assert isinstance(mb, OneDimModule)
-        assert mb.input_permutation == Permutation(torch.arange(4))
+        assert mb.input_permutation == Permutation(torch.arange(3))
         assert mb.input_permutation is mb.output_permutation
 
         mb.input_permutation = None
@@ -353,16 +420,22 @@ class TestOneDimModule:
 
     @staticmethod
     def test_shapes() -> None:
-        bn_a, bn_b = nn.BatchNorm2d(4), nn.BatchNorm2d(4)
-        mb = initialize_module(bn_a, bn_b)
-        assert mb.input_shape == bn_a.weight.shape[0]
-        assert mb.output_shape == bn_a.weight.shape[0]
+        bn_a, bn_b, node = modules_and_module_nodes(
+            nn.BatchNorm2d(3), nn.BatchNorm2d(3), torch.randn(1, 3, 12, 12)
+        )
+        mb = initialize_module(bn_a, bn_b, node)
+        assert mb.input_permutation_shape == bn_a.weight.shape[0]
+        assert mb.output_permutation_shape == bn_a.weight.shape[0]
 
 
 class TestLayerNormModule:
     @staticmethod
     def test_permutation_to_info() -> None:
-        mb = initialize_module(nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]))
+        mb = initialize_module(
+            *modules_and_module_nodes(
+                nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
+            )
+                     )
         assert isinstance(mb, LayerNormModule)
 
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
@@ -373,11 +446,13 @@ class TestLayerNormModule:
 
     @staticmethod
     def test_apply_permutations() -> None:
-        ln_a, ln_b = nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5])
+        ln_a, ln_b, node = modules_and_module_nodes(
+            nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
+        )
         ln_b.weight.data = torch.randn_like(ln_b.weight.data)
         ln_b.bias.data = torch.randn_like(ln_b.bias.data)
         ln_b_orig = copy.deepcopy(ln_b)
-        mb = initialize_module(ln_a, ln_b)
+        mb = initialize_module(ln_a, ln_b, node)
 
         mb.input_permutation = Permutation(torch.tensor([2, 0, 4, 1, 3]))
         assert mb.output_permutation is mb.input_permutation
@@ -388,7 +463,11 @@ class TestLayerNormModule:
 
     @staticmethod
     def test_none_permutation() -> None:
-        mb = initialize_module(nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]))
+        mb = initialize_module(
+            *modules_and_module_nodes(
+                nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
+            )
+        )
         assert isinstance(mb, LayerNormModule)
 
         mb.input_permutation = None
@@ -397,15 +476,19 @@ class TestLayerNormModule:
 
     @staticmethod
     def test_shapes() -> None:
-        ln_a, ln_b = nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5])
-        mb = initialize_module(ln_a, ln_b)
-        assert mb.input_shape == ln_a.weight.shape[1]
-        assert mb.output_shape == ln_a.weight.shape[1]
+        ln_a, ln_b, node = modules_and_module_nodes(
+            nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
+        )
+        mb = initialize_module(ln_a, ln_b, node)
+        assert mb.input_permutation_shape == ln_a.weight.shape[1]
+        assert mb.output_permutation_shape == ln_a.weight.shape[1]
 
-        ln_a, ln_b = nn.LayerNorm(3), nn.LayerNorm(3)
-        mb = initialize_module(ln_a, ln_b)
-        assert mb.input_shape == ln_a.weight.shape[0]
-        assert mb.output_shape == ln_a.weight.shape[0]
+        ln_a, ln_b, node = modules_and_module_nodes(
+            nn.LayerNorm(3), nn.LayerNorm(3), torch.randn(4, 3)
+        )
+        mb = initialize_module(ln_a, ln_b, node)
+        assert mb.input_permutation_shape == ln_a.weight.shape[0]
+        assert mb.output_permutation_shape == ln_a.weight.shape[0]
 
 
 class TestMultiheadAttentionModule:
@@ -413,9 +496,14 @@ class TestMultiheadAttentionModule:
     def test_permutation_to_info() -> None:
         embed_dim = 6
         num_heads = 3
-        mha = nn.MultiheadAttention(embed_dim, num_heads)
+        x = torch.randn(6, 6, 6)
+        mha, mhb, node = modules_and_module_nodes(
+            nn.MultiheadAttention(embed_dim, num_heads),
+            nn.MultiheadAttention(embed_dim, num_heads),
+            (x, x, x),
+        )
 
-        mb = MultiheadAttentionModule(mha, mha)
+        mb = MultiheadAttentionModule(mha, mhb, node)
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
         mb.output_permutation = Permutation(torch.tensor([4, 2, 3, 1, 0, 5]))
 
@@ -448,10 +536,15 @@ class TestMultiheadAttentionModule:
     def test_input_permutation() -> None:
         embed_dim = 6
         num_heads = 3
-        mha = nn.MultiheadAttention(embed_dim, num_heads, bias=False)
-        mha_orig = copy.deepcopy(mha)
+        x = torch.randn(6, 6)
+        mha, mhb, node = modules_and_module_nodes(
+            nn.MultiheadAttention(embed_dim, num_heads, bias=False),
+            nn.MultiheadAttention(embed_dim, num_heads, bias=False),
+            (x, x, x),
+        )
+        mhb_orig = copy.deepcopy(mhb)
 
-        mb = MultiheadAttentionModule(mha, mha)
+        mb = MultiheadAttentionModule(mha, mhb, node)
         perm = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
         mb.input_permutation = perm
         mb.output_permutation = perm
@@ -459,11 +552,15 @@ class TestMultiheadAttentionModule:
         assert mb.input_permutation == perm
         assert mb.output_permutation == perm
         mb.apply_permutations()
-        assert model_change_percent(mha_orig, mha) > 0.1
+        assert model_change_percent(mhb_orig, mhb) > 0.1
 
-        mha = nn.MultiheadAttention(embed_dim, num_heads, bias=False, kdim=4, vdim=5)
-        mha_orig = copy.deepcopy(mha)
-        mb = MultiheadAttentionModule(mha, mha)
+        mha, mhb, node = modules_and_module_nodes(
+            nn.MultiheadAttention(embed_dim, num_heads, bias=False, kdim=4, vdim=5),
+            nn.MultiheadAttention(embed_dim, num_heads, bias=False, kdim=4, vdim=5),
+            (x, torch.randn(6, 4), torch.randn(6, 5)),
+        )
+        mhb_orig = copy.deepcopy(mhb)
+        mb = MultiheadAttentionModule(mha, mhb, node)
         perm = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
         mb.input_permutation = perm
         mb.output_permutation = None
@@ -472,7 +569,7 @@ class TestMultiheadAttentionModule:
         assert mb.output_permutation is None
         mb.apply_permutations()
 
-        assert model_change_percent(mha_orig, mha) < 1e-6
+        assert model_change_percent(mhb_orig, mhb) < 1e-6
 
     @staticmethod
     def test_io() -> None:
@@ -501,9 +598,17 @@ class TestMultiheadAttentionModule:
         x = torch.randn(embed_dim, embed_dim)
         y_orig = model(x)
 
-        lin1_mod = initialize_module(model.lin1, model.lin1)
-        mha_mod = initialize_module(model.mha, model.mha)
-        lin2_mod = initialize_module(model.lin2, model.lin2)
+        lin1_mod = initialize_module(
+            *modules_and_module_nodes(model.lin1, model.lin1, x)
+        )
+        mha_mod = initialize_module(
+            *modules_and_module_nodes(
+                model.mha, model.mha, (model.lin1(x), model.lin1(x), model.lin1(x))
+            )
+        )
+        lin2_mod = initialize_module(
+            *modules_and_module_nodes(model.lin2, model.lin2, x)
+        )
 
         perm1 = Permutation(torch.tensor([2, 0, 1, 3, 4, 5]))
         perm2 = Permutation(torch.tensor([0, 4, 2, 5, 1, 3]))
@@ -526,14 +631,23 @@ class TestMultiheadAttentionModule:
     def test_shapes() -> None:
         embed_dim = 6
         num_heads = 3
-        mha = nn.MultiheadAttention(embed_dim, num_heads)
-        mb = initialize_module(mha, mha)
-        assert isinstance(mha.in_proj_weight, nn.Parameter)
-        assert mb.input_shape == embed_dim
-        assert mb.output_shape == embed_dim
+        x = torch.randn(6, 6)
+        mha, mhb, node = modules_and_module_nodes(
+            nn.MultiheadAttention(embed_dim, num_heads),
+            nn.MultiheadAttention(embed_dim, num_heads),
+            (x, x, x),
+        )
+        mb = initialize_module(mha, mhb, node)
+        assert isinstance(mhb.in_proj_weight, nn.Parameter)
+        assert mb.input_permutation_shape == embed_dim
+        assert mb.output_permutation_shape == embed_dim
 
-        mha = nn.MultiheadAttention(embed_dim, num_heads, kdim=4, vdim=5)
-        mb = initialize_module(mha, mha)
-        assert mha.in_proj_weight is None
-        assert mb.input_shape == 0  # Only get input_permutation for in_proj_weight
-        assert mb.output_shape == embed_dim
+        mha, mhb, node = modules_and_module_nodes(
+            nn.MultiheadAttention(embed_dim, num_heads, kdim=4, vdim=5),
+            nn.MultiheadAttention(embed_dim, num_heads, kdim=4, vdim=5),
+            (x, torch.randn(6, 4), torch.randn(6, 5)),
+        )
+        mb = initialize_module(mha, mhb, node)
+        assert mhb.in_proj_weight is None
+        assert mb.input_permutation_shape == 0
+        assert mb.output_permutation_shape == embed_dim

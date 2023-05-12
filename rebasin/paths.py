@@ -54,8 +54,12 @@ class LinearPath:
             perm_pt += 1
 
     @property
-    def input_shape(self) -> int:
-        return int(self[0].input_shape) if bool(self) else 0
+    def input_permutation_shape(self) -> int:
+        return int(self[0].input_permutation_shape) if bool(self) else 0
+
+    @property
+    def input_shape(self) -> list[tuple[int, ...]]:
+        return self[0].input_shape if bool(self) else []  # type: ignore[no-any-return]
 
     @property
     def output_permutation(self) -> Permutation | None:
@@ -79,8 +83,15 @@ class LinearPath:
             perm_pt -= 1
 
     @property
-    def output_shape(self) -> int:
-        return int(self[-1].output_shape) if bool(self) else 0
+    def output_permutation_shape(self) -> int:
+        return int(self[-1].output_permutation_shape) if bool(self) else 0
+
+    @property
+    def output_shape(self) -> list[tuple[int, ...]]:
+        return (  # type: ignore[no-any-return]
+            self[-1].output_shape
+            if bool(self) else []
+        )
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -109,10 +120,16 @@ class LinearPath:
         changes the layout of the weights and biases of the model, but not
         its output.
         """
+        if not bool(self):
+            return
+
         if prev_path is None:
             self.input_permutation = None
-        else:
+        elif prev_path.output_shape == self.input_shape:
             self.input_permutation = prev_path.output_permutation
+        else:
+            self.input_permutation = None
+            prev_path.output_permutation = None
 
         pt0, pt1 = 0, 1
         while pt1 < len(self):
@@ -140,16 +157,21 @@ class LinearPath:
     def __repr__(self) -> str:
         modules_strings = [
             f"  {mod.__class__.__name__}("
-            + f"\n    module_type: {mod.module_type.__name__}"
+            + f"\n    module.type: {mod.module_type.__name__}"
+            + f"\n    input.shape: {mod.input_shape}"
+            + f"\n    output.shape: {mod.output_shape}"
             + (
-                f"\n    input_shape: {mod.input_shape}"
+                f"\n    weight.in_dim.permutation.shape: {mod.input_permutation_shape}"
                 if mod.input_permutation is not None
-                else "\n    input_shape: None"
-            ) + (
-                f"\n    output_shape: {mod.output_shape}"
+                else "\n    weight.in_dim.permutation: None"
+            )
+            + (
+                f"\n    weight.out_dim.permutation.shape: "
+                f"{mod.output_permutation_shape}"
                 if mod.output_permutation is not None
-                else "\n    output_shape: None"
-            ) + f"\n  )\n\n"
+                else "\n    weight.out_dim.permutation: None"
+            )
+            + f"\n  )\n\n"
             for mod in self
         ]
 
@@ -195,6 +217,9 @@ class ParallelPaths:
     def __getitem__(self, index: int) -> LinearPath:
         return self.paths[index]
 
+    def __bool__(self) -> bool:
+        return any(bool(path) for path in self)
+
     @property
     def input_permutation(self) -> Permutation | None:
         """
@@ -215,7 +240,7 @@ class ParallelPaths:
             self._set_all_input_permutations(permutation)
             return
 
-        shapes = [path.input_shape for path in self if bool(path)]
+        shapes = [path.input_permutation_shape for path in self if bool(path)]
         if (
                 permutation.perm_indices.shape[0] == shapes[0]
                 and all(shape == shapes[0] for shape in shapes)
@@ -225,6 +250,13 @@ class ParallelPaths:
     def _set_all_input_permutations(self, permutation: Permutation | None) -> None:
         for path in self:
             path.input_permutation = permutation
+
+    @property
+    def input_shape(self) -> list[tuple[int, ...]]:
+        shapes = [path.input_shape for path in self if bool(path)]
+        if not all(shape == shapes[0] for shape in shapes):
+            return []
+        return shapes[0]
 
     @property
     def output_permutation(self) -> Permutation | None:
@@ -240,7 +272,7 @@ class ParallelPaths:
             self._set_all_output_permutations(permutation)
             return
 
-        shapes = [path.output_shape for path in self if bool(path)]
+        shapes = [path.output_permutation_shape for path in self if bool(path)]
         if (
                 permutation.perm_indices.shape[0] == shapes[0]
                 and all(shape == shapes[0] for shape in shapes)
@@ -250,6 +282,13 @@ class ParallelPaths:
     def _set_all_output_permutations(self, permutation: Permutation | None) -> None:
         for path in self:
             path.output_permutation = permutation
+
+    @property
+    def output_shape(self) -> list[tuple[int, ...]]:
+        shapes = [path.output_shape for path in self if bool(path)]
+        if not all(shape == shapes[0] for shape in shapes):
+            return []
+        return shapes[0]
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:

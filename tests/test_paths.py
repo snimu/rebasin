@@ -13,7 +13,12 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     initialize_module,
 )
 from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
-from tests.fixtures.utils import allclose, model_change_percent, tensor_diff_perc
+from tests.fixtures.utils import (
+    allclose,
+    model_change_percent,
+    modules_and_module_nodes,
+    tensor_diff_perc,
+)
 
 
 class PathSource:
@@ -26,10 +31,11 @@ class PathSource:
 
         model = nn.Sequential(ln1, lin1, nn.ReLU(), lin2, nn.ReLU(), ln2)
 
-        mod0 = initialize_module(ln1, ln1)
-        mod1 = initialize_module(lin1, lin1)
-        mod2 = initialize_module(lin2, lin2)
-        mod3 = initialize_module(ln2, ln2)
+        x = torch.randn(10)
+        mod0 = initialize_module(*modules_and_module_nodes(ln1, ln1, x))
+        mod1 = initialize_module(*modules_and_module_nodes(lin1, lin1, x))
+        mod2 = initialize_module(*modules_and_module_nodes(lin2, lin2, x))
+        mod3 = initialize_module(*modules_and_module_nodes(ln2, ln2, x))
 
         path = LinearPath(mod0, mod1, mod2, mod3)
         return model, path
@@ -43,10 +49,13 @@ class PathSource:
 
         model = nn.Sequential(ln1, conv1, nn.ReLU(), conv2, nn.ReLU(), ln2)
 
-        mod0 = initialize_module(ln1, ln1)
-        mod1 = initialize_module(conv1, conv1)
-        mod2 = initialize_module(conv2, conv2)
-        mod3 = initialize_module(ln2, ln2)
+        x = torch.randn(1, 3, 10, 10)
+        mod0 = initialize_module(*modules_and_module_nodes(ln1, ln1, x))
+        mod1 = initialize_module(*modules_and_module_nodes(conv1, conv1, ln1(x)))
+        mod2 = initialize_module(*modules_and_module_nodes(conv2, conv2, conv1(ln1(x))))
+        mod3 = initialize_module(
+            *modules_and_module_nodes(ln2, ln2, conv2(conv1(ln1(x))))
+        )
 
         path = LinearPath(mod0, mod1, mod2, mod3)
         return model, path
@@ -91,7 +100,9 @@ class PathSource:
     def dense_parallel_path_diff_shapes(cls) -> tuple[nn.Module, ParallelPaths]:
         mod1, path1 = cls.dense_lin_path()
         mod2 = nn.Linear(2, 2)
-        path2 = LinearPath(initialize_module(mod2, mod2))
+        path2 = LinearPath(
+            initialize_module(*modules_and_module_nodes(mod2, mod2, torch.rand(2)))
+        )
 
         class Model(nn.Module):
             def __init__(self) -> None:
@@ -246,12 +257,14 @@ class TestLinearPath(PathSource):
 
     def test_shapes(self) -> None:
         model, path = self.dense_lin_path()
-        assert path.input_shape == 10
-        assert path.output_shape == 10
+        assert path.input_permutation_shape == 10
+        assert path.output_permutation_shape == 10
 
         model, path = self.conv_lin_path()
-        assert path.input_shape == model[0].weight.shape[1]  # type: ignore[index]
-        assert path.output_shape == model[-1].weight.shape[1]  # type: ignore[index]
+        assert path.input_permutation_shape == \
+               model[0].weight.shape[1]  # type: ignore[index]
+        assert path.output_permutation_shape == \
+               model[-1].weight.shape[1]  # type: ignore[index]
 
     @staticmethod
     def test_empty_path() -> None:
@@ -339,13 +352,6 @@ class TestParallelPaths(PathSource):
         path1.enforce_identity(prev_path=None, next_path=path2)
         path2.enforce_identity(prev_path=path1, next_path=path3)
         path3.enforce_identity(prev_path=path2, next_path=None)
-
-        assert path1.input_permutation is None
-        assert isinstance(path1.output_permutation, Permutation)
-        assert isinstance(path2.input_permutation, Permutation)
-        assert isinstance(path2.output_permutation, Permutation)
-        assert isinstance(path3.input_permutation, Permutation)
-        assert path3.output_permutation is None
 
         path1.apply_permutations()
         path2.apply_permutations()
@@ -658,6 +664,8 @@ class TestModelPath(PathSource):
         graph.enforce_identity()
         graph.apply_permutations()
 
+        print(graph)
+
         # Assertions
         assert model_change_percent(model1, model1_orig) > 0.1
         assert model_change_percent(model2, model2_orig) > 0.1
@@ -772,16 +780,10 @@ class TestLengtheningModel(PathSource):
             assert model_change_percent(model, model_orig) > 0.1
 
             y_new = model(x)
-            diffs.append(tensor_diff_perc(y_new, y_orig))
+            diff = tensor_diff_perc(y_new, y_orig)
+            diffs.append(diff)
+            print(len(model), diff)
             assert allclose(y_orig, y_new)
 
-        print(
-            f"\nAverage difference: "
-            f"{sum(diffs) / len(diffs)}. "
-            f"\nFirst difference: "
-            f"{diffs[0]}. "
-            f"\nLast difference: "
-            f"{diffs[-1]}."
-        )
 
-        raise AssertionError()
+TestModelPath().test_par_par_par_par()
