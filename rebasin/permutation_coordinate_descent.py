@@ -8,8 +8,8 @@ from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
-from rebasin._initializer import PermutationInitialization
-from rebasin.structs import ModuleParameters, Permutation
+from rebasin.modules import Permutation, PermutationInfo  # type: ignore[attr-defined]
+from rebasin.permutation_initializer import PermutationInitializer
 
 
 def calculate_progress(
@@ -113,14 +113,6 @@ class PermutationCoordinateDescent:
 
             Type: bool.
             Default: False.
-        enforce_identity:
-            If True, the permutations will be applied to :code:`model_b` in such a way
-            that the model's output is unchanged.
-            If False, they won't. However, more filters will be permuted,
-            which will lead to :code:`model_b` being closer to :code:`model_a`.
-
-            Type: bool.
-            Default: True.
     """
 
     def __init__(
@@ -132,7 +124,6 @@ class PermutationCoordinateDescent:
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
             verbose: bool = False,
-            enforce_identity: bool = True,
     ) -> None:
         self.model_b = model_b
         self.device_a = device_a
@@ -142,9 +133,10 @@ class PermutationCoordinateDescent:
         if verbose:
             print("Initializing permutations...")
 
-        self.pinit = PermutationInitialization(
-            model_a, model_b, input_data_b, input_data_a, enforce_identity
+        self.pinit = PermutationInitializer(
+            model_a, model_b, input_data_b, input_data_a
         )
+        self.pinit.model_graph.enforce_identity()
 
         if verbose:
             print("Done.")
@@ -192,19 +184,19 @@ class PermutationCoordinateDescent:
         """
         progress = False
 
-        for i in torch.randperm(len(self.pinit.perm_to_info)):
+        for i in torch.randperm(len(self.pinit.model_graph.permutation_to_info)):
             # For mypy: give typehint
             perm_and_info: tuple[
-                Permutation, list[tuple[int, ModuleParameters]]
-            ] = self.pinit.perm_to_info[i]
+                Permutation, list[PermutationInfo]
+            ] = self.pinit.model_graph.permutation_to_info[i]
 
-            perm, perm_info = perm_and_info
+            perm, perm_infos = perm_and_info
             n = len(perm.perm_indices)
             cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
             if self.verbose:
                 loop.write("Calculating cost tensor...")
-            for axis, module_parameters in perm_info:
+            for perm_info in perm_infos:
                 # Copy so that the original parameter isn't moved to device_b.
                 # If this were not done, then in one of the later steps,
                 #   model_a would be almost completely on device_b.
@@ -214,28 +206,18 @@ class PermutationCoordinateDescent:
                 # Also, we will apply some permutations, but don't want this
                 #   to affect the original parameter, because we might do this
                 #   again in another iteration.
-                params = copy.deepcopy(module_parameters)
+                info = copy.deepcopy(perm_info)
 
                 # Apply all permutations except the one we are currently working on.
-                params.apply_permutations(except_axis=axis)
-                w_a = params.weight_a.to(self.device_b)
-                w_b = params.weight_b.to(self.device_b)
-                b_a = (
-                    params.bias_a.to(self.device_b)
-                    if params.bias_a is not None and axis == 0
-                    else None
-                )
-                b_b = (
-                    params.bias_b.to(self.device_b)
-                    if params.bias_b is not None and axis == 0
-                    else None
-                )
+                info.module.apply_permutations(except_axis=info.axis)
+                w_a = info.parameter_a.to(self.device_b)
+                w_b = info.parameter_b.to(self.device_b)
 
                 # We want a square matrix as a cost tensor.
                 # It should have shape (n, n).
                 # To achieve this, we first move the axis of interest to the front.
-                w_a = w_a.moveaxis(axis, 0) if len(w_a.shape) > 1 else w_a
-                w_b = w_b.moveaxis(axis, 0) if len(w_b.shape) > 1 else w_b
+                w_a = w_a.moveaxis(info.axis, 0) if len(w_a.shape) > 1 else w_a
+                w_b = w_b.moveaxis(info.axis, 0) if len(w_b.shape) > 1 else w_b
 
                 # Then, we reshape the tensor to (n, -1).
                 # This means that all dimensions except the first one are flattened.
@@ -256,10 +238,6 @@ class PermutationCoordinateDescent:
                 #   but ideally to make the entire path through the model
                 #   as similar as possible between the two.
                 cost_tensor += w_a @ w_b
-
-                # Add the biases if they exist.
-                if b_a is not None and b_b is not None:
-                    cost_tensor += b_a @ b_b
 
             if self.verbose:
                 loop.write(f"Done. Cost matrix shape: {cost_tensor.shape}.")
@@ -312,4 +290,4 @@ class PermutationCoordinateDescent:
         if self.verbose:
             print("Applying permutations...")
 
-        self.pinit.paths.apply_permutations()
+        self.pinit.model_graph.apply_permutations()

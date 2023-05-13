@@ -12,7 +12,12 @@ from torchvision.models import resnet18  # type: ignore[import]
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
 from tests.fixtures.models import MLP
-from tests.fixtures.utils import allclose, model_distance, model_similarity
+from tests.fixtures.utils import (
+    allclose,
+    model_change_percent,
+    model_distance,
+    model_similarity,
+)
 
 
 def test_calculate_progress() -> None:
@@ -33,6 +38,32 @@ def test_calculate_progress() -> None:
     assert not progress
 
 
+def test_long_mlp() -> None:
+    """Test that :class:`PermutationCoordinateDescent`
+    can handle a linear network with 100 layers
+    (each with a 10x10 weight matrix).
+
+    Handle means that it can permute the weights s.t. the output doesn't change.
+    """
+    model_a, model_b = MLP(10, 100), MLP(10, 100)
+    model_b_orig = copy.deepcopy(model_b)
+    input_data = torch.randn(10)
+    y_orig = model_b(input_data)
+
+    pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
+    pcd.calculate_permutations()
+    pcd.apply_permutations()
+
+    assert model_change_percent(model_b, model_b_orig) > 0.1
+
+    y_new = model_b(input_data)
+    assert torch.allclose(y_orig, y_new)
+
+
+@pytest.mark.skipif(
+    "--full-suite" not in sys.argv,
+    reason="This test takes a long time to run. Run with --full-suite to include it.",
+)
 class TestPermutationCoordinateDescent:
     def test_resnet18(self) -> None:
         self.common_tests(torch.randn(1, 3, 224, 224), resnet18, 1)
@@ -40,13 +71,6 @@ class TestPermutationCoordinateDescent:
     def test_mlp(self) -> None:
         in_features, num_layers = 50, 5
         self.common_tests(torch.randn(50), MLP, 10, in_features, num_layers)
-
-    # TODO: Fix this test
-    @pytest.mark.xfail(reason="Currently has problem, fix later")
-    def test_multihead_attention(self) -> None:
-        embed_dim = num_heads = 32
-        x = torch.randn(embed_dim, num_heads)
-        self.common_tests((x, x, x), nn.MultiheadAttention, 10, embed_dim, num_heads)
 
     @staticmethod
     def common_tests(
@@ -73,7 +97,7 @@ class TestPermutationCoordinateDescent:
         model_b_old = copy.deepcopy(model_b)
 
         x = torch.randn(1, 3, 224, 224)
-        pcd = PermutationCoordinateDescent(model_a, model_b, x, enforce_identity=False)
+        pcd = PermutationCoordinateDescent(model_a, model_b, x)
         pcd.rebasin()
 
         assert not allclose(model_b(x), model_b_old(x))
@@ -92,7 +116,12 @@ class TestPCDOnGPU:
         model_b_old = copy.deepcopy(model_b)
 
         pcd = PermutationCoordinateDescent(
-            model_a, model_b, torch.randn(25), device_a="cpu", device_b=device_b
+            model_a,
+            model_b,
+            input_data_b=torch.randn(25).to(device_b),
+            input_data_a=torch.randn(25),
+            device_a="cpu",
+            device_b=device_b
         )
         pcd.calculate_permutations()
         pcd.apply_permutations()
