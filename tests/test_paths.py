@@ -12,7 +12,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     Permutation,
     initialize_module,
 )
-from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
+from rebasin.paths import LinearPath, ParallelPaths, PathSequence
 from tests.fixtures.paths import PathSource
 from tests.fixtures.utils import (
     allclose,
@@ -484,7 +484,7 @@ class TestModelPath(PathSource):
         model2, path2 = self.dense_parallel_path_no_empty_path()
         model3, path3 = self.dense_lin_path()
         model = nn.Sequential(model1, model2, model3)
-        graph = ModelGraph(path1, path2, path3)
+        graph = PathSequence(path1, path2, path3)
 
         model1_orig = copy.deepcopy(model1)
         model2_orig = copy.deepcopy(model2)
@@ -516,7 +516,7 @@ class TestModelPath(PathSource):
         model2, path2 = self.dense_parallel_path_with_empty_path()
         model3, path3 = self.dense_lin_path()
         model = nn.Sequential(model1, model2, model3)
-        graph = ModelGraph(path1, path2, path3)
+        graph = PathSequence(path1, path2, path3)
 
         model1_orig = copy.deepcopy(model1)
         model2_orig = copy.deepcopy(model2)
@@ -549,7 +549,7 @@ class TestModelPath(PathSource):
         model3, path3 = self.dense_parallel_path_no_empty_path()
         model4, path4 = self.dense_parallel_path_with_empty_path()
         model = nn.Sequential(model1, model2, model3, model4)
-        graph = ModelGraph(path1, path2, path3, path4)
+        graph = PathSequence(path1, path2, path3, path4)
 
         model1_orig = copy.deepcopy(model1)
         model2_orig = copy.deepcopy(model2)
@@ -584,7 +584,7 @@ class TestModelPath(PathSource):
         model3, path3 = self.dense_parallel_path_with_empty_path()
         model4, path4 = self.dense_parallel_path_no_empty_path()
         model = nn.Sequential(model1, model2, model3, model4)
-        graph = ModelGraph(path1, path2, path3, path4)
+        graph = PathSequence(path1, path2, path3, path4)
 
         model1_orig = copy.deepcopy(model1)
         model2_orig = copy.deepcopy(model2)
@@ -665,7 +665,7 @@ class TestLengtheningModel(PathSource):
                 model_n, path_n = constructor()
                 model.append(model_n)
                 paths.append(path_n)
-            graph = ModelGraph(*paths)
+            graph = PathSequence(*paths)
             model_orig = copy.deepcopy(model)
 
             y_orig = model(x)

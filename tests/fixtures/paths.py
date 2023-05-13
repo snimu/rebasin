@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from rebasin.modules import initialize_module  # type: ignore[attr-defined]
-from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
+from rebasin.paths import LinearPath, ParallelPaths, PathSequence
 from tests.fixtures.utils import modules_and_module_nodes
 
 

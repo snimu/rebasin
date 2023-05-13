@@ -9,7 +9,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     MODULE_TYPES,
     initialize_module,
 )
-from rebasin.paths import LinearPath, ModelGraph, ParallelPaths
+from rebasin.paths import LinearPath, ParallelPaths, PathSequence
 from rebasin.type_definitions import NODE_TYPES
 
 
@@ -32,7 +32,7 @@ class PermutationInitializer:
 
         self.model_graph = self.initialize_permutations()
 
-    def initialize_permutations(self) -> ModelGraph:
+    def initialize_permutations(self) -> PathSequence:
         """Initialize the permutations of the model.
         """
 
@@ -70,7 +70,7 @@ class PermutationInitializer:
                 #   only in the subsequent LinearPath (and what follows it).
                 paths.append(path)
 
-        return ModelGraph(*paths)
+        return PathSequence(*paths)
 
     def initialize_linear_path(
             self, nextnodes_a: list[NODE_TYPES], nextnodes_b: list[NODE_TYPES]
@@ -106,35 +106,120 @@ class PermutationInitializer:
     def initialize_parallel_paths(
             self, nextnodes_a: list[NODE_TYPES], nextnodes_b: list[NODE_TYPES]
     ) -> tuple[ParallelPaths, list[NODE_TYPES], list[NODE_TYPES]]:
-        paths: list[LinearPath] = []
+        # In some models, there are nested parallel paths.
+        # For example, in torchvision.models.efficientnet_b1,
+        #   there are parallel paths which consist of a linear path
+        #   next to a sequence of a linear path followed by a parallel path,
+        #   which is then followed by another linear path.
+        # To handle this, we first find the common final nodes of all parallel paths.
+        # We can do this with only model_b, because the similarity of the
+        #   model architectures is tested later when constructing the paths.
+        # This is what we do second: construct the paths.
 
-        assert len(nextnodes_a) == len(nextnodes_b), self._err_msg
+        # 1. Find common final nodes
+        common_finalnodes = self._get_finalnodes(nextnodes_a, nextnodes_b)
 
+        # 2. Construct paths
+        paths: list[LinearPath | PathSequence] = []
         finalnodes_a: list[NODE_TYPES] = []
         finalnodes_b: list[NODE_TYPES] = []
-        prev_final_nodes_a: list[NODE_TYPES] = []
-        prev_final_nodes_b: list[NODE_TYPES] = []
 
         for node_a, node_b in zip(nextnodes_a, nextnodes_b):
-            path, finalnodes_a, finalnodes_b = self.initialize_linear_path(
-                [node_a], [node_b]
+            if [node_b] == common_finalnodes:
+                # If the node is a common final node,
+                #   then it is already handled by the common final nodes.
+                paths.append(LinearPath())
+                continue
+            path, finalnodes_a, finalnodes_b = self._construct_subpath(
+                node_a, node_b, common_finalnodes
             )
-            assert len(finalnodes_a) == len(finalnodes_b), self._err_msg
-
-            # All LinearPaths in this ParallelPaths must end in the same modules.
-            if not prev_final_nodes_a:
-                prev_final_nodes_a = finalnodes_a
-                prev_final_nodes_b = finalnodes_b
-
-            # assert prev_final_nodes_a == finalnodes_a, (
-            #     "This network architecture is not supported! "
-            #     "Please look at README.md for more information."
-            # )
-            # assert prev_final_nodes_b == finalnodes_b, (
-            #     "This network architecture is not supported! "
-            #     "Please look at README.md for more information."
-            # )
+            assert len(nextnodes_a) == len(nextnodes_b), self._err_msg
 
             paths.append(path)
 
         return ParallelPaths(*paths), finalnodes_a, finalnodes_b
+
+    def _get_finalnodes(
+            self, nextnodes_a: list[NODE_TYPES], nextnodes_b: list[NODE_TYPES]
+    ) -> list[NODE_TYPES]:
+        finalnodes_per_path: list[list[list[NODE_TYPES]]] = [
+            [[n]] for n in nextnodes_b
+        ]
+
+        while True:
+            nextnextnodes_a: list[NODE_TYPES | None] = []
+            nextnextnodes_b: list[NODE_TYPES | None] = []
+            for i, (node_a, node_b) in enumerate(zip(nextnodes_a, nextnodes_b)):
+                if node_b is None:
+                    assert node_a is None, self._err_msg
+                    nextnextnodes_a.append(None)
+                    nextnextnodes_b.append(None)
+                    continue
+
+                _, finalnodes_a, finalnodes_b = self.initialize_linear_path(
+                    [node_a], [node_b]
+                )
+                finalnodes_per_path[i].append(finalnodes_b)
+
+                # If we have multiple next nodes, we can simply look at the first,
+                #   because all nodes should end in one finalnodes list.
+                # The specific structure of the subpaths
+                #   will be handeled in _construct_subpath.
+                nextnextnodes_a.append(finalnodes_a[0] if finalnodes_a else None)
+                nextnextnodes_b.append(finalnodes_b[0] if finalnodes_b else None)
+
+            if all(node is None for node in nextnextnodes_b):
+                return []
+
+            for finalnodes_b in finalnodes_per_path[0]:
+                if all(
+                        finalnodes_b in finalnodes_per_path[i]
+                        for i in range(1, len(finalnodes_per_path))
+                ):
+                    return finalnodes_b
+
+            nextnodes_a = nextnextnodes_a  # type: ignore[assignment]
+            nextnodes_b = nextnextnodes_b  # type: ignore[assignment]
+
+    def _construct_subpath(
+            self,
+            node_a: NODE_TYPES,
+            node_b: NODE_TYPES,
+            common_finalnodes: list[NODE_TYPES]
+    ) -> tuple[LinearPath | PathSequence, list[NODE_TYPES], list[NODE_TYPES]]:
+        path0, finalnodes_a, finalnodes_b = self.initialize_linear_path(
+            [node_a], [node_b]
+        )
+        paths: list[LinearPath | ParallelPaths] = [path0]
+
+        while finalnodes_b != common_finalnodes:
+            assert len(finalnodes_a) == len(finalnodes_b), self._err_msg
+
+            path: LinearPath | ParallelPaths
+
+            if len(finalnodes_a) == 0:
+                break
+            if len(finalnodes_a) == 1:
+                # If there is only one final node, we can simply construct the path
+                #   from the next nodes.
+                path, finalnodes_a, finalnodes_b = self.initialize_linear_path(
+                    finalnodes_a, finalnodes_b
+                )
+            else:
+                # If there are multiple final nodes,
+                #   we have to construct a ParallelPaths.
+                path, finalnodes_a, finalnodes_b = self.initialize_parallel_paths(
+                    finalnodes_a, finalnodes_b
+                )
+            paths.append(path)
+
+        if len(paths) == 0:
+            raise ValueError("No paths found")
+
+        if len(paths) == 1:
+            ret_path = paths[0]
+            assert isinstance(ret_path, LinearPath), \
+                "Can't have PathSequence with one path only"
+            return ret_path, finalnodes_a, finalnodes_b
+
+        return PathSequence(*paths), finalnodes_a, finalnodes_b

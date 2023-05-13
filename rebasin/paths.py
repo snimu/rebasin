@@ -109,8 +109,8 @@ class LinearPath:
 
     def enforce_identity(
             self,
-            prev_path: LinearPath | ParallelPaths | None = None,
-            next_path: LinearPath | ParallelPaths | None = None
+            prev_path: LinearPath | ParallelPaths | PathSequence | None = None,
+            next_path: LinearPath | ParallelPaths | PathSequence | None = None
     ) -> None:
         """
         Enforce the constraint that the permutations in :class:`LinearPath`
@@ -202,19 +202,19 @@ class ParallelPaths:
     are parallel paths.They consist of :class:`LinearPath` objects.
     """
 
-    def __init__(self, *paths: LinearPath):
+    def __init__(self, *paths: LinearPath | PathSequence):
         self.paths = list(paths)
         for p in self.paths:
-            assert isinstance(p, LinearPath), \
-                "Parallel paths must consist of linear paths."
+            assert isinstance(p, LinearPath | PathSequence), \
+                "Parallel paths must consist of LinearPath or PathSequence."
 
-    def __iter__(self) -> Iterator[LinearPath]:
+    def __iter__(self) -> Iterator[LinearPath | PathSequence]:
         return iter(self.paths)
 
     def __len__(self) -> int:
         return len(self.paths)
 
-    def __getitem__(self, index: int) -> LinearPath:
+    def __getitem__(self, index: int) -> LinearPath | PathSequence:
         return self.paths[index]
 
     def __bool__(self) -> bool:
@@ -252,6 +252,13 @@ class ParallelPaths:
             path.input_permutation = permutation
 
     @property
+    def input_permutation_shape(self) -> int:
+        shapes = [path.input_permutation_shape for path in self if bool(path)]
+        if not all(shape == shapes[0] for shape in shapes):
+            return 0
+        return shapes[0]
+
+    @property
     def input_shape(self) -> list[tuple[int, ...]]:
         shapes = [path.input_shape for path in self if bool(path)]
         if not all(shape == shapes[0] for shape in shapes):
@@ -282,6 +289,13 @@ class ParallelPaths:
     def _set_all_output_permutations(self, permutation: Permutation | None) -> None:
         for path in self:
             path.output_permutation = permutation
+
+    @property
+    def output_permutation_shape(self) -> int:
+        shapes = [path.output_permutation_shape for path in self if bool(path)]
+        if not all(shape == shapes[0] for shape in shapes):
+            return 0
+        return shapes[0]
 
     @property
     def output_shape(self) -> list[tuple[int, ...]]:
@@ -417,7 +431,7 @@ class ParallelPaths:
         return "ParallelPaths(" + "\n".join(final_path_strings) + "\n)"
 
 
-class ModelGraph:
+class PathSequence:
     """
     The graph of the model.
 
@@ -448,12 +462,28 @@ class ModelGraph:
         self[0].input_permutation = permutation
 
     @property
+    def input_permutation_shape(self) -> int:
+        return self[0].input_permutation_shape
+
+    @property
+    def input_shape(self) -> list[tuple[int, ...]]:
+        return self[0].input_shape
+
+    @property
     def output_permutation(self) -> Permutation | None:
         return self[-1].output_permutation
 
     @output_permutation.setter
     def output_permutation(self, permutation: Permutation | None) -> None:
         self[-1].output_permutation = permutation
+
+    @property
+    def output_permutation_shape(self) -> int:
+        return self[-1].output_permutation_shape
+
+    @property
+    def output_shape(self) -> list[tuple[int, ...]]:
+        return self[-1].output_shape
 
     @property
     def permutation_to_info(self) -> list[tuple[Permutation, list[PermutationInfo]]]:
@@ -469,12 +499,16 @@ class ModelGraph:
 
         return [perm_info for perm_info in id_to_perminfo.values()]
 
-    def enforce_identity(self) -> None:
+    def enforce_identity(
+            self,
+            prev_path: LinearPath | ParallelPaths | None = None,
+            next_path: LinearPath | ParallelPaths | None = None
+    ) -> None:
         """Enforce the identity constraint on all paths."""
         for i in range(len(self)):
-            prev_path = self[i - 1] if i > 0 else None
-            next_path = self[i + 1] if i < len(self) - 1 else None
-            self[i].enforce_identity(prev_path=prev_path, next_path=next_path)
+            prev_path_ = self[i - 1] if i > 0 else prev_path
+            next_path_ = self[i + 1] if i < len(self) - 1 else next_path
+            self[i].enforce_identity(prev_path=prev_path_, next_path=next_path_)
 
     def apply_permutations(self) -> None:
         """Apply the permutations in the paths to the model."""
@@ -484,13 +518,23 @@ class ModelGraph:
     def __repr__(self) -> str:
         reprs: list[str] = []
         for i, path in enumerate(self):
-            width = max(len(line) for line in repr(path).splitlines())
+            path_repr = repr(path)
+            width = max(len(line) for line in path_repr.splitlines())
             if i > 0:
                 reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
                 reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
                 reprs.append(" " * (width // 2 - 1) + "|" + " " * (width // 2 - 1))
             reprs.append("-" * width)
-            reprs.append(repr(path))
+            reprs.append(path_repr)
             reprs.append("-" * width)
 
-        return "ModelGraph(\n" + "\n".join(reprs) + "\n)"
+        reprs = ["\nPathSequence(", *reprs] + [")"]
+        width = max(len(line) for text in reprs for line in text.splitlines())
+
+        for i, text in enumerate(reprs):
+            reprs[i] = "\n".join(
+                line + " " * (width - len(line))
+                for line in text.splitlines()
+            )
+
+        return "\n".join(reprs)
