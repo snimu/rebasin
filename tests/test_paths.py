@@ -664,8 +664,6 @@ class TestModelPath(PathSource):
         graph.enforce_identity()
         graph.apply_permutations()
 
-        print(graph)
-
         # Assertions
         assert model_change_percent(model1, model1_orig) > 0.1
         assert model_change_percent(model2, model2_orig) > 0.1
