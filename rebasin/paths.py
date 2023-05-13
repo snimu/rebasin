@@ -125,7 +125,10 @@ class LinearPath:
 
         if prev_path is None:
             self.input_permutation = None
-        elif prev_path.output_shape == self.input_shape:
+        elif (
+                prev_path.output_shape == self.input_shape
+                and prev_path.output_permutation_shape == self.input_permutation_shape
+        ):
             self.input_permutation = prev_path.output_permutation
         else:
             self.input_permutation = None
@@ -142,7 +145,8 @@ class LinearPath:
                 pt1 += 1
                 continue
 
-            self[pt1].input_permutation = self[pt0].output_permutation
+            if self[pt0].output_permutation_shape == self[pt1].input_permutation_shape:
+                self[pt1].input_permutation = self[pt0].output_permutation
             pt0 += 1
             pt1 += 1
 
