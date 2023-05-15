@@ -371,8 +371,9 @@ class OneDimModule(ModuleBase):
             )
 
 
-class LayerNormModule(ModuleBase):
-    """A module for :class:`nn.LayerNorm`."""
+class InputPermIsOutputPermMultiDimModule(ModuleBase):
+    """A module for modules for which the input permutation and output permutation
+     are both at dim 1, like :class:`nn.LayerNorm` or :class:`nn.Embedding`."""
 
     def __init__(
             self,
@@ -428,8 +429,8 @@ class LayerNormModule(ModuleBase):
             self.module_a.weight,
             self.module_b.weight,
         )]
-        if self.module_b.bias is not None:
-            assert self.module_a.bias is not None, \
+        if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
+            assert hasattr(self.module_a, "bias") and self.module_a.bias is not None, \
                 "Module A has no bias, but Module B does."
             info.append(PermutationInfo(
                 self,
@@ -451,7 +452,7 @@ class LayerNormModule(ModuleBase):
         )
 
         if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
-            assert self.module_a.bias is not None, \
+            assert hasattr(self.module_a, "bias") and self.module_a.bias is not None, \
                 "Module A has no bias, but Module B does."
             self.permute_parameter(
                 self.module_b.bias,
@@ -608,12 +609,13 @@ MODULE_TYPES = Union[
     ModuleBase,
     DefaultModule,
     OneDimModule,
-    LayerNormModule,
+    InputPermIsOutputPermMultiDimModule,
     MultiheadAttentionModule
 ]
 
 SPECIAL_MODULES: dict[Any, object] = {
-    nn.LayerNorm: LayerNormModule,
+    nn.LayerNorm: InputPermIsOutputPermMultiDimModule,
+    nn.Embedding: InputPermIsOutputPermMultiDimModule,
     nn.MultiheadAttention: MultiheadAttentionModule,
 }
 
@@ -634,7 +636,6 @@ def initialize_module(
     if type(module_a) in SPECIAL_MODULES:
         constructor = SPECIAL_MODULES[type(module_a)]
         return constructor(module_a, module_b, module_node_b)
-
     if (
             hasattr(module_b, "weight")
             and hasattr(module_a, "weight")

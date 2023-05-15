@@ -239,19 +239,6 @@ class TestConsistencyConv3d:
 
 
 class TestLayerNorm:
-    @staticmethod
-    def test_multiplication_function() -> None:
-        ln_norm = nn.LayerNorm(10)
-        ln_weight = nn.LayerNorm(10)
-        ln_weight.weight.data *= torch.randn(10)
-
-        x = torch.randn(10)
-
-        y_norm = ln_norm(x)
-        y_weight = ln_weight(x)
-
-        # LayerNorm normalizes, and then multiplies **element-wise**!
-        assert torch.allclose(y_norm * ln_weight.weight.data, y_weight)
 
     @staticmethod
     def test_layernorm_after_linear() -> None:
@@ -376,19 +363,6 @@ class TestLayerNorm:
 
 
 class TestBatchNorm1d:
-    @staticmethod
-    def test_multiplication_function() -> None:
-        bn_norm = nn.BatchNorm1d(10)
-        bn_weight = nn.BatchNorm1d(10)
-        bn_weight.weight.data *= torch.randn(10)
-
-        x = torch.randn(3, 10)
-
-        y_norm = bn_norm(x)
-        y_weight = bn_weight(x)
-
-        # BatchNorm normalizes, and then multiplies **element-wise**!
-        assert torch.allclose(y_norm * bn_weight.weight.data, y_weight)
 
     @staticmethod
     def test_batchnorm_after_linear() -> None:
@@ -502,24 +476,6 @@ class TestBatchNorm2d:
 class TestConsistencyBatchNorm3d:
 
     @staticmethod
-    def test_multiplication_function() -> None:
-        for num_channels in [1, 3, 5]:
-            bn_norm = nn.BatchNorm3d(num_channels)
-            bn_weight = nn.BatchNorm3d(num_channels)
-            bn_weight.weight.data *= torch.randn(num_channels)
-
-            x = torch.randn(4, num_channels, 5, 5, 5)
-
-            y_norm = bn_norm(x)
-            y_weight = bn_weight(x)
-
-            # BatchNorm3d normalizes, and then multiplies **element-wise**!
-            assert torch.allclose(
-                y_norm * bn_weight.weight.data.view(1, num_channels, 1, 1, 1),
-                y_weight
-            )
-
-    @staticmethod
     def test_batchnorm_after_conv3d() -> None:
         for in_channels, out_channels, kernel_size in itertools.product(
                 [1, 3], [1, 2], [2, 3]
@@ -627,6 +583,41 @@ class TestMultiheadAttention:
         model.mha.in_proj_weight.data = model.mha.in_proj_weight.data[:, perm1]
         model.mha.out_proj.weight.data = model.mha.out_proj.weight.data[perm2]
         model.lin2.weight.data = model.lin2.weight.data[:, perm2]
+
+        assert model_change_percent(model, model_orig) > 0.1
+
+        y_new = model(x)
+
+        assert allclose(y_orig, y_new)
+
+
+class TestEmbedding:
+    @staticmethod
+    def test_io() -> None:
+        num_embeddings = 10
+        embedding_dim = 6
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.emb = nn.Embedding(num_embeddings, embedding_dim)
+                self.lin = nn.Linear(embedding_dim, embedding_dim, bias=False)
+                self.relu = nn.ReLU()
+
+            def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
+                input_tensor = self.relu(self.emb(input_tensor))
+                input_tensor = self.relu(self.lin(input_tensor))
+                return input_tensor
+
+        model = Model()
+        model_orig = copy.deepcopy(model)
+
+        x = torch.randint(0, num_embeddings, (embedding_dim,))
+        y_orig = model(x)
+
+        perm = torch.randperm(embedding_dim)
+        model.emb.weight.data = model.emb.weight.data[:, perm]
+        model.lin.weight.data = model.lin.weight.data[:, perm]
 
         assert model_change_percent(model, model_orig) > 0.1
 

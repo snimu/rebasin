@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from rebasin.modules import (  # type: ignore[attr-defined]
     MODULE_TYPES,
-    LayerNormModule,
+    InputPermIsOutputPermMultiDimModule,
     OneDimModule,
     Permutation,
     PermutationInfo,
@@ -45,7 +45,9 @@ class LinearPath:
         # meaning that they have to be connected.
         while (
             perm_pt < len(self) - 1
-            and isinstance(self[perm_pt], (OneDimModule, LayerNormModule))
+            and isinstance(
+                self[perm_pt], (OneDimModule, InputPermIsOutputPermMultiDimModule)
+            )
         ):
             self[perm_pt + 1].input_permutation = permutation
             perm_pt += 1
@@ -73,7 +75,9 @@ class LinearPath:
 
         while(
             perm_pt > -len(self)
-            and isinstance(self[perm_pt], (OneDimModule, LayerNormModule))
+            and isinstance(
+                self[perm_pt], (OneDimModule, InputPermIsOutputPermMultiDimModule)
+            )
         ):
             self[perm_pt].input_permutation = permutation
             self[perm_pt - 1].output_permutation = permutation
