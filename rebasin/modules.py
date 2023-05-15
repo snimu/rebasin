@@ -605,15 +605,7 @@ MODULE_TYPES = Union[
     MultiheadAttentionModule
 ]
 
-MODULE_CONSTRUCTOR_TYPES = Union[
-    type[ModuleBase],
-    type[DefaultModule],
-    type[OneDimModule],
-    type[LayerNormModule],
-    type[MultiheadAttentionModule]
-]
-
-SPECIAL_MODULES: dict[Any, MODULE_CONSTRUCTOR_TYPES] = {
+SPECIAL_MODULES: dict[Any, object] = {
     nn.LayerNorm: LayerNormModule,
     nn.MultiheadAttention: MultiheadAttentionModule,
 }
@@ -633,7 +625,8 @@ def initialize_module(
     otherwise None.
     """
     if type(module_a) in SPECIAL_MODULES:
-        return SPECIAL_MODULES[type(module_a)](module_a, module_b, module_node_b)
+        constructor = SPECIAL_MODULES[type(module_a)]
+        return constructor(module_a, module_b, module_node_b)
 
     if hasattr(module_b, "weight") and hasattr(module_a, "weight"):
         return (
