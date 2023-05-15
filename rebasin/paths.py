@@ -16,9 +16,6 @@ class LinearPath:
 
     def __init__(self, *modules: MODULE_TYPES) -> None:
         self.modules = list(modules)
-        for m in self.modules:
-            assert isinstance(m, MODULE_TYPES), \
-                "Linear paths must consist of modules from rebasin.modules."
 
     def __iter__(self) -> Iterator[MODULE_TYPES]:
         return iter(self.modules)
