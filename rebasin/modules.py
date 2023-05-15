@@ -160,24 +160,17 @@ class DefaultModule(ModuleBase):
     ) -> None:
         super().__init__(module_a, module_b, module_node_b)
 
-        if not hasattr(self.module_a, "weight"):
-            raise AttributeError(f"Module has no weight: {type(self.module_a)}")
-        if not hasattr(self.module_b, "weight"):
-            raise AttributeError(f"Module has no weight: {type(self.module_b)}")
-
-        if not isinstance(self.module_a.weight, nn.Parameter):
-            raise TypeError(
-                f"Module weight is not a parameter: {type(self.module_a.weight)}"
-            )
-        if not isinstance(self.module_b.weight, nn.Parameter):
-            raise TypeError(
-                f"Module weight is not a parameter: {type(self.module_b.weight)}"
-            )
-        if not isinstance(self.module_a.bias, nn.Parameter | type(None)):
+        if (
+                hasattr(self.module_a, "bias")
+                and not isinstance(self.module_a.bias, nn.Parameter | type(None))
+        ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_a.bias)}"
             )
-        if not isinstance(self.module_b.bias, nn.Parameter | type(None)):
+        if (
+                hasattr(self.module_b, "bias")
+                and not isinstance(self.module_b.bias, nn.Parameter | type(None))
+        ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_b.bias)}"
             )
@@ -200,6 +193,16 @@ class DefaultModule(ModuleBase):
                 raise ValueError(
                     f"Module bias shapes do not match: "
                     f"{self.module_a.bias.shape} vs {self.module_b.bias.shape}"
+                )
+
+        if hasattr(module_b, "bias") and self.module_b.bias is not None:
+            if not hasattr(module_a, "bias"):
+                raise AttributeError(
+                    f"Module B has bias, but Module A has no bias."
+                )
+            if module_a.bias is None:
+                raise ValueError(
+                    "Module B has bias, but Module A's bias is None."
                 )
 
         self.axis_to_permutation: dict[int, Permutation | None] = {
@@ -632,7 +635,12 @@ def initialize_module(
         constructor = SPECIAL_MODULES[type(module_a)]
         return constructor(module_a, module_b, module_node_b)
 
-    if hasattr(module_b, "weight") and hasattr(module_a, "weight"):
+    if (
+            hasattr(module_b, "weight")
+            and hasattr(module_a, "weight")
+            and isinstance(module_a.weight, nn.Parameter)
+            and isinstance(module_b.weight, nn.Parameter)
+    ):
         return (
             OneDimModule(module_a, module_b, module_node_b)
             if len(module_b.weight.shape) == 1
