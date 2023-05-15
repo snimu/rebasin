@@ -162,14 +162,14 @@ class DefaultModule(ModuleBase):
 
         if (
                 hasattr(self.module_a, "bias")
-                and not isinstance(self.module_a.bias, nn.Parameter | type(None))
+                and not isinstance(self.module_a.bias, (nn.Parameter, type(None)))
         ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_a.bias)}"
             )
         if (
                 hasattr(self.module_b, "bias")
-                and not isinstance(self.module_b.bias, nn.Parameter | type(None))
+                and not isinstance(self.module_b.bias, (nn.Parameter, type(None)))
         ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_b.bias)}"

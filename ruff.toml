@@ -11,7 +11,10 @@ select = [
     "NPY", # NumPy-specific rules
     "RUF", # Ruff-specific rules
 ]
-ignore = ["B905"]  # for zip, `strict`-option is not available in Python<3.10
+ignore = [
+    "UP038",  # Python8 cannot do isinstance(x, a | b); must do isinstance(x, (a, b))
+    "B905",  # for zip, `strict`-option is not available in Python<3.10
+]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 fixable = [

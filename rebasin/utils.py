@@ -67,7 +67,7 @@ def recalculate_batch_norms(
     # Reset the running mean and variance
     for module in model.modules():
         if (
-                not isinstance(module, nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d)
+                not isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
                 or not hasattr(module, "running_mean")
                 or not hasattr(module, "running_var")
                 or module.running_mean is None
@@ -169,7 +169,7 @@ def model_info(model: nn.Module) -> ModelInfo:
     """
     name = model.__class__.__name__
     contains_batch_norm = any(
-        isinstance(m, nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d)
+        isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
         for m in model.modules()
     )
     num_parameters = sum(p.numel() for p in model.parameters())
