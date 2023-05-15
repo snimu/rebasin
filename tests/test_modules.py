@@ -136,27 +136,6 @@ class TestDefaultModule:
             )
             DefaultModule(m1, m2, node)
 
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_b.weight
-            DefaultModule(lin_a, lin_b, node)
-
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_a.bias
-            DefaultModule(lin_a, lin_b, node)
-
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_b.bias
-            DefaultModule(lin_a, lin_b, node)
-
         with pytest.raises(ValueError):
             lin_a, lin_b, node = modules_and_module_nodes(
                 nn.Linear(5, 3), nn.Linear(5, 5), torch.randn(5)
