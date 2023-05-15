@@ -633,7 +633,7 @@ def initialize_module(
     initialized with the given modules, if the type of the Module supports permutation,
     otherwise None.
     """
-    if type(module_a) in SPECIAL_MODULES:
+    if any(isinstance(module_b, mtype) for mtype in SPECIAL_MODULES):
         constructor = SPECIAL_MODULES[type(module_a)]
         return constructor(module_a, module_b, module_node_b)
     if (
