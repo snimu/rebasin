@@ -164,10 +164,6 @@ class DefaultModule(ModuleBase):
             raise AttributeError(f"Module has no weight: {type(self.module_a)}")
         if not hasattr(self.module_b, "weight"):
             raise AttributeError(f"Module has no weight: {type(self.module_b)}")
-        if not hasattr(self.module_a, "bias"):
-            raise AttributeError(f"Module has no bias: {type(self.module_a)}")
-        if not hasattr(self.module_b, "bias"):
-            raise AttributeError(f"Module has no bias: {type(self.module_b)}")
 
         if not isinstance(self.module_a.weight, nn.Parameter):
             raise TypeError(
@@ -191,7 +187,11 @@ class DefaultModule(ModuleBase):
                 f"Module weight shapes do not match: "
                 f"{self.module_a.weight.shape} vs {self.module_b.weight.shape}"
             )
-        if self.module_a.bias is not None:
+        if hasattr(module_a, "bias") and self.module_a.bias is not None:
+            if not hasattr(module_b, "bias"):
+                raise AttributeError(
+                    f"Module A has bias, but Module B has no bias."
+                )
             if module_b.bias is None:
                 raise ValueError(
                     "Module A has bias, but Module B's bias is None."
@@ -280,7 +280,11 @@ class DefaultModule(ModuleBase):
                 self.module_b.weight,
                 axis, permutation.perm_indices
             )
-            if self.module_b.bias is not None and axis == 0:  # axis 0: out-dim -> bias
+            if (
+                    hasattr(self.module_b, "bias")
+                    and self.module_b.bias is not None
+                    and axis == 0  # axis 0: out-dim -> bias
+            ):
                 self.permute_parameter(
                     self.module_b.bias,
                     axis, permutation.perm_indices
