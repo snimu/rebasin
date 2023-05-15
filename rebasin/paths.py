@@ -230,6 +230,8 @@ class ParallelPaths:
         are the same, it returns the common permutation (even if it is :code:`None`),
         else it returns :code:`None`.
         """
+        if not bool(self):
+            return None
         perms = [path.input_permutation for path in self if bool(path)]
         if not all(perm is perms[0] for perm in perms):
             return None
@@ -237,6 +239,8 @@ class ParallelPaths:
 
     @input_permutation.setter
     def input_permutation(self, permutation: Permutation | None) -> None:
+        if not bool(self):
+            return
         if permutation is None:
             self._set_all_input_permutations(permutation)
             return
@@ -254,6 +258,8 @@ class ParallelPaths:
 
     @property
     def input_permutation_shape(self) -> int:
+        if not bool(self):
+            return 0
         shapes = [path.input_permutation_shape for path in self if bool(path)]
         if not all(shape == shapes[0] for shape in shapes):
             return 0
@@ -261,6 +267,8 @@ class ParallelPaths:
 
     @property
     def input_shape(self) -> list[tuple[int, ...]]:
+        if not bool(self):
+            return []
         shapes = [path.input_shape for path in self if bool(path)]
         if not all(shape == shapes[0] for shape in shapes):
             return []
@@ -269,6 +277,8 @@ class ParallelPaths:
     @property
     def output_permutation(self) -> Permutation | None:
         """The permutation of the output of the last module."""
+        if not bool(self):
+            return None
         perms = [path.output_permutation for path in self if bool(path)]
         if not all(perm is perms[0] for perm in perms):
             return None
@@ -276,6 +286,8 @@ class ParallelPaths:
 
     @output_permutation.setter
     def output_permutation(self, permutation: Permutation) -> None:
+        if not bool(self):
+            return
         if permutation is None:
             self._set_all_output_permutations(permutation)
             return
@@ -293,6 +305,8 @@ class ParallelPaths:
 
     @property
     def output_permutation_shape(self) -> int:
+        if not bool(self):
+            return 0
         shapes = [path.output_permutation_shape for path in self if bool(path)]
         if not all(shape == shapes[0] for shape in shapes):
             return 0
@@ -300,6 +314,8 @@ class ParallelPaths:
 
     @property
     def output_shape(self) -> list[tuple[int, ...]]:
+        if not bool(self):
+            return []
         shapes = [path.output_shape for path in self if bool(path)]
         if not all(shape == shapes[0] for shape in shapes):
             return []
@@ -439,7 +455,7 @@ class PathSequence:
     Consists of :class:`LinearPath` and :class:`ParallelPaths`.
     """
     def __init__(self, *paths: LinearPath | ParallelPaths) -> None:
-        self.paths = list(paths)
+        self.paths = [path for path in paths if bool(path)]
         assert all(
             isinstance(path, (LinearPath, ParallelPaths))
             for path in self.paths
@@ -453,6 +469,9 @@ class PathSequence:
 
     def __getitem__(self, index: int) -> LinearPath | ParallelPaths:
         return self.paths[index]
+
+    def __bool__(self) -> bool:
+        return any(bool(path) for path in self)
 
     @property
     def input_permutation(self) -> Permutation | None:
