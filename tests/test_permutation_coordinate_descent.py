@@ -7,7 +7,11 @@ from typing import Any
 import pytest
 import torch
 from torch import nn
-from torchvision.models import resnet18  # type: ignore[import]
+from torchvision.models import (  # type: ignore[import]
+    ViT_B_16_Weights,
+    resnet18,
+    vit_b_16,
+)
 
 from rebasin import PermutationCoordinateDescent
 from rebasin.permutation_coordinate_descent import calculate_progress
@@ -66,29 +70,40 @@ def test_long_mlp() -> None:
 )
 class TestPermutationCoordinateDescent:
     def test_resnet18(self) -> None:
-        self.common_tests(torch.randn(1, 3, 224, 224), resnet18, 1)
+        self.common_tests(torch.randn(1, 3, 224, 224), resnet18(), resnet18(), 1)
 
     def test_mlp(self) -> None:
-        in_features, num_layers = 50, 5
-        self.common_tests(torch.randn(50), MLP, 10, in_features, num_layers)
+        self.common_tests(torch.randn(50), MLP(50, 15), MLP(50, 15), 1)
+
+    def test_vit_b_16(self) -> None:
+        self.common_tests(
+            torch.randn(1, 3, 224, 224),
+            vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1),
+            vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1),
+            iters=1
+        )
 
     @staticmethod
     def common_tests(
-            input_data: Any, constructor: Any, iters: int, *args: Any
+            input_data: Any, model_a: nn.Module, model_b: nn.Module, iters: int = 10
     ) -> None:
         for _ in range(iters):
-            model_a = constructor(*args)
-            model_b = constructor(*args)
-
+            model_a = model_a.eval()
+            model_b = model_b.eval()
             model_b_old = copy.deepcopy(model_b)  # for comparison
+
+            y_orig = model_b(input_data)
+
             pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
-            pcd.calculate_permutations()
-            pcd.apply_permutations()
+            pcd.rebasin()
 
             assert (
                     model_distance(model_a, model_b)
                     < model_distance(model_a, model_b_old)
             )
+
+            y_new = model_b(input_data)
+            allclose(y_orig, y_new)
 
     @staticmethod
     def test_enforce_identity() -> None:
@@ -100,7 +115,7 @@ class TestPermutationCoordinateDescent:
         pcd = PermutationCoordinateDescent(model_a, model_b, x)
         pcd.rebasin()
 
-        assert not allclose(model_b(x), model_b_old(x))
+        assert allclose(model_b(x), model_b_old(x))
         assert (
                 model_distance(model_a, model_b)
                 < model_distance(model_a, model_b_old)

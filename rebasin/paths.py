@@ -382,6 +382,14 @@ class ParallelPaths:
         #       and so does prev_path.output_permutation.
         # 5. If there is an empty path in self,
         #       and neither prev_path nor next_path are None,
+        #       but next_path.input_permutation is None,
+        #       then it should be treated as if it there were no next_path.
+        #       This means setting self.input_permutation, self.output_permutation,
+        #       and prev_path.output_permutation to None.
+        #       This case will (I believe) only be encountered
+        #       on the second, reverse pass through the PathSequence.enforce_identity.
+        # 6. If there is an empty path in self,
+        #       and neither prev_path nor next_path are None,
         #       then self.output_permutation has to be prev_path.output_permutation.
 
         # 1. Done
@@ -409,7 +417,13 @@ class ParallelPaths:
             prev_path.output_permutation = None
             return
 
-        # 5. Synchronize output_permutation
+        # 5. Set permutations to None
+        if next_path.input_permutation is None:
+            self.input_permutation = None
+            self.output_permutation = None
+            prev_path.output_permutation = None
+
+        # 6. Synchronize output_permutation
         self.output_permutation = prev_path.output_permutation
 
     def apply_permutations(self) -> None:
@@ -530,6 +544,13 @@ class PathSequence:
     ) -> None:
         """Enforce the identity constraint on all paths."""
         for i in range(len(self)):
+            prev_path_ = self[i - 1] if i > 0 else prev_path
+            next_path_ = self[i + 1] if i < len(self) - 1 else next_path
+            self[i].enforce_identity(prev_path=prev_path_, next_path=next_path_)
+
+        # Deal with special cases, like a path with empty input_permutation
+        #   following a ParallelPaths with an empty path.
+        for i in range(len(self) - 1, -1, -1):
             prev_path_ = self[i - 1] if i > 0 else prev_path
             next_path_ = self[i + 1] if i < len(self) - 1 else next_path
             self[i].enforce_identity(prev_path=prev_path_, next_path=next_path_)
