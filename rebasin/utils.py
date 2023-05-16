@@ -9,7 +9,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from rebasin.structs import ModelInfo, ModuleParameters, Permutation
+from rebasin.model_info import ModelInfo
 
 
 def recalculate_batch_norms(
@@ -67,7 +67,7 @@ def recalculate_batch_norms(
     # Reset the running mean and variance
     for module in model.modules():
         if (
-                not isinstance(module, nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d)
+                not isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
                 or not hasattr(module, "running_mean")
                 or not hasattr(module, "running_var")
                 or module.running_mean is None
@@ -169,7 +169,7 @@ def model_info(model: nn.Module) -> ModelInfo:
     """
     name = model.__class__.__name__
     contains_batch_norm = any(
-        isinstance(m, nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d)
+        isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
         for m in model.modules()
     )
     num_parameters = sum(p.numel() for p in model.parameters())
@@ -235,34 +235,3 @@ def pairwise(iterable: Sequence[Any]) -> Iterator[tuple[Any, Any]]:
         a, b = itertools.tee(iterable)
         next(b, None)
         return zip(a, b)
-
-
-def path_to_permutations(
-        path: list[ModuleParameters]
-) -> list[tuple[Permutation, list[tuple[int, ModuleParameters]]]]:
-    """
-    Takes a path and returns a list of permutations, with the corresponding
-    :class:`ModuleParameters` objects that use that permutation, and the
-    corresponding axis for each of those.
-
-    :param path: The path, a list of :class:`ModuleParameters` objects.
-    :return: The permutations with their info, as described above.
-    """
-    id_to_info: dict[
-        int,
-        tuple[Permutation, list[tuple[int, ModuleParameters]]]
-    ] = {}
-
-    for module_params in path:
-        for axis, perm in module_params.axis_to_permutation.items():
-            if id(perm) in id_to_info:
-                id_to_info[id(perm)][1].append((axis, module_params))
-            else:
-                id_to_info[id(perm)] = (perm, [(axis, module_params)])
-
-    perm_to_info: list[tuple[Permutation, list[tuple[int, ModuleParameters]]]] = []
-
-    for info in id_to_info.values():
-        perm_to_info.append(info)
-
-    return perm_to_info

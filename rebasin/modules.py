@@ -160,28 +160,17 @@ class DefaultModule(ModuleBase):
     ) -> None:
         super().__init__(module_a, module_b, module_node_b)
 
-        if not hasattr(self.module_a, "weight"):
-            raise AttributeError(f"Module has no weight: {type(self.module_a)}")
-        if not hasattr(self.module_b, "weight"):
-            raise AttributeError(f"Module has no weight: {type(self.module_b)}")
-        if not hasattr(self.module_a, "bias"):
-            raise AttributeError(f"Module has no bias: {type(self.module_a)}")
-        if not hasattr(self.module_b, "bias"):
-            raise AttributeError(f"Module has no bias: {type(self.module_b)}")
-
-        if not isinstance(self.module_a.weight, nn.Parameter):
-            raise TypeError(
-                f"Module weight is not a parameter: {type(self.module_a.weight)}"
-            )
-        if not isinstance(self.module_b.weight, nn.Parameter):
-            raise TypeError(
-                f"Module weight is not a parameter: {type(self.module_b.weight)}"
-            )
-        if not isinstance(self.module_a.bias, nn.Parameter | type(None)):
+        if (
+                hasattr(self.module_a, "bias")
+                and not isinstance(self.module_a.bias, (nn.Parameter, type(None)))
+        ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_a.bias)}"
             )
-        if not isinstance(self.module_b.bias, nn.Parameter | type(None)):
+        if (
+                hasattr(self.module_b, "bias")
+                and not isinstance(self.module_b.bias, (nn.Parameter, type(None)))
+        ):
             raise TypeError(
                 f"Module bias is not a parameter or None: {type(self.module_b.bias)}"
             )
@@ -191,7 +180,11 @@ class DefaultModule(ModuleBase):
                 f"Module weight shapes do not match: "
                 f"{self.module_a.weight.shape} vs {self.module_b.weight.shape}"
             )
-        if self.module_a.bias is not None:
+        if hasattr(module_a, "bias") and self.module_a.bias is not None:
+            if not hasattr(module_b, "bias"):
+                raise AttributeError(
+                    f"Module A has bias, but Module B has no bias."
+                )
             if module_b.bias is None:
                 raise ValueError(
                     "Module A has bias, but Module B's bias is None."
@@ -200,6 +193,16 @@ class DefaultModule(ModuleBase):
                 raise ValueError(
                     f"Module bias shapes do not match: "
                     f"{self.module_a.bias.shape} vs {self.module_b.bias.shape}"
+                )
+
+        if hasattr(module_b, "bias") and self.module_b.bias is not None:
+            if not hasattr(module_a, "bias"):
+                raise AttributeError(
+                    f"Module B has bias, but Module A has no bias."
+                )
+            if module_a.bias is None:
+                raise ValueError(
+                    "Module B has bias, but Module A's bias is None."
                 )
 
         self.axis_to_permutation: dict[int, Permutation | None] = {
@@ -280,7 +283,11 @@ class DefaultModule(ModuleBase):
                 self.module_b.weight,
                 axis, permutation.perm_indices
             )
-            if self.module_b.bias is not None and axis == 0:  # axis 0: out-dim -> bias
+            if (
+                    hasattr(self.module_b, "bias")
+                    and self.module_b.bias is not None
+                    and axis == 0  # axis 0: out-dim -> bias
+            ):
                 self.permute_parameter(
                     self.module_b.bias,
                     axis, permutation.perm_indices
@@ -364,8 +371,9 @@ class OneDimModule(ModuleBase):
             )
 
 
-class LayerNormModule(ModuleBase):
-    """A module for :class:`nn.LayerNorm`."""
+class InputPermIsOutputPermMultiDimModule(ModuleBase):
+    """A module for modules for which the input permutation and output permutation
+     are both at dim 1, like :class:`nn.LayerNorm` or :class:`nn.Embedding`."""
 
     def __init__(
             self,
@@ -421,8 +429,8 @@ class LayerNormModule(ModuleBase):
             self.module_a.weight,
             self.module_b.weight,
         )]
-        if self.module_b.bias is not None:
-            assert self.module_a.bias is not None, \
+        if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
+            assert hasattr(self.module_a, "bias") and self.module_a.bias is not None, \
                 "Module A has no bias, but Module B does."
             info.append(PermutationInfo(
                 self,
@@ -444,7 +452,7 @@ class LayerNormModule(ModuleBase):
         )
 
         if hasattr(self.module_b, "bias") and self.module_b.bias is not None:
-            assert self.module_a.bias is not None, \
+            assert hasattr(self.module_a, "bias") and self.module_a.bias is not None, \
                 "Module A has no bias, but Module B does."
             self.permute_parameter(
                 self.module_b.bias,
@@ -601,20 +609,13 @@ MODULE_TYPES = Union[
     ModuleBase,
     DefaultModule,
     OneDimModule,
-    LayerNormModule,
+    InputPermIsOutputPermMultiDimModule,
     MultiheadAttentionModule
 ]
 
-MODULE_CONSTRUCTOR_TYPES = Union[
-    type[ModuleBase],
-    type[DefaultModule],
-    type[OneDimModule],
-    type[LayerNormModule],
-    type[MultiheadAttentionModule]
-]
-
-SPECIAL_MODULES: dict[Any, MODULE_CONSTRUCTOR_TYPES] = {
-    nn.LayerNorm: LayerNormModule,
+SPECIAL_MODULES: dict[Any, object] = {
+    nn.LayerNorm: InputPermIsOutputPermMultiDimModule,
+    nn.Embedding: InputPermIsOutputPermMultiDimModule,
     nn.MultiheadAttention: MultiheadAttentionModule,
 }
 
@@ -632,10 +633,15 @@ def initialize_module(
     initialized with the given modules, if the type of the Module supports permutation,
     otherwise None.
     """
-    if type(module_a) in SPECIAL_MODULES:
-        return SPECIAL_MODULES[type(module_a)](module_a, module_b, module_node_b)
-
-    if hasattr(module_b, "weight") and hasattr(module_a, "weight"):
+    if any(isinstance(module_b, mtype) for mtype in SPECIAL_MODULES):
+        constructor = SPECIAL_MODULES[type(module_a)]
+        return constructor(module_a, module_b, module_node_b)
+    if (
+            hasattr(module_b, "weight")
+            and hasattr(module_a, "weight")
+            and isinstance(module_a.weight, nn.Parameter)
+            and isinstance(module_b.weight, nn.Parameter)
+    ):
         return (
             OneDimModule(module_a, module_b, module_node_b)
             if len(module_b.weight.shape) == 1

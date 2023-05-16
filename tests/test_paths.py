@@ -686,6 +686,3 @@ class TestLengtheningModel(PathSource):
             diffs.append(diff)
             print(len(model), diff)
             assert allclose(y_orig, y_new)
-
-
-TestModelPath().test_par_par_par_par()

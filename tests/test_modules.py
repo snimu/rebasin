@@ -15,7 +15,7 @@ from torch import nn
 
 from rebasin.modules import (
     DefaultModule,
-    LayerNormModule,
+    InputPermIsOutputPermMultiDimModule,
     ModuleBase,
     MultiheadAttentionModule,
     OneDimModule,
@@ -135,27 +135,6 @@ class TestDefaultModule:
                 (torch.randn(5, 5), torch.randn(5, 5), torch.randn(5, 5))
             )
             DefaultModule(m1, m2, node)
-
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_b.weight
-            DefaultModule(lin_a, lin_b, node)
-
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_a.bias
-            DefaultModule(lin_a, lin_b, node)
-
-        with pytest.raises(AttributeError):
-            lin_a, lin_b, node = modules_and_module_nodes(
-                nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(5)
-            )
-            del lin_b.bias
-            DefaultModule(lin_a, lin_b, node)
 
         with pytest.raises(ValueError):
             lin_a, lin_b, node = modules_and_module_nodes(
@@ -428,7 +407,7 @@ class TestOneDimModule:
         assert mb.output_permutation_shape == bn_a.weight.shape[0]
 
 
-class TestLayerNormModule:
+class TestInputPermIsOutputPermMultiDimModule:
     @staticmethod
     def test_permutation_to_info() -> None:
         mb = initialize_module(
@@ -436,7 +415,7 @@ class TestLayerNormModule:
                 nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
             )
                      )
-        assert isinstance(mb, LayerNormModule)
+        assert isinstance(mb, InputPermIsOutputPermMultiDimModule)
 
         mb.input_permutation = Permutation(torch.tensor([2, 0, 1, 3]))
         assert mb.input_permutation == Permutation(torch.tensor([2, 0, 1, 3]))
@@ -468,7 +447,7 @@ class TestLayerNormModule:
                 nn.LayerNorm([4, 5]), nn.LayerNorm([4, 5]), torch.randn(4, 5)
             )
         )
-        assert isinstance(mb, LayerNormModule)
+        assert isinstance(mb, InputPermIsOutputPermMultiDimModule)
 
         mb.input_permutation = None
         assert mb.input_permutation is None
@@ -489,6 +468,43 @@ class TestLayerNormModule:
         mb = initialize_module(ln_a, ln_b, node)
         assert mb.input_permutation_shape == ln_a.weight.shape[0]
         assert mb.output_permutation_shape == ln_a.weight.shape[0]
+
+    @staticmethod
+    def test_embedding() -> None:
+        emb_a, emb_b, node = modules_and_module_nodes(
+            nn.Embedding(10, 5), nn.Embedding(10, 5), torch.randint(0, 10, (5,))
+        )
+        emb_mod = initialize_module(emb_a, emb_b, node)
+
+        lin_a, lin_b, node = modules_and_module_nodes(
+            nn.Linear(5, 5), nn.Linear(5, 5), torch.randn(4, 5)
+        )
+        lin_mod = initialize_module(lin_a, lin_b, node)
+
+        class Model(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lin = lin_b
+                self.emb = emb_b
+                self.relu = nn.ReLU()
+
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return self.relu(self.lin(self.emb(x)))
+
+        model = Model()
+        model_orig = copy.deepcopy(model)
+        x = torch.randint(0, 10, (5,))
+        y_orig = model(x)
+        perm = Permutation(torch.tensor([2, 0, 1, 3, 4]))
+        emb_mod.output_permutation = perm
+        emb_mod.apply_permutations()
+        lin_mod.input_permutation = perm
+        lin_mod.output_permutation = None
+        lin_mod.apply_permutations()
+
+        assert model_change_percent(model, model_orig) > 0.1
+        y_new = model(x)
+        assert torch.allclose(y_new, y_orig)
 
 
 class TestMultiheadAttentionModule:

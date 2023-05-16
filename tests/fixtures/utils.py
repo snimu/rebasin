@@ -6,7 +6,6 @@ import torch
 from torch import nn
 from torchview import ModuleNode, draw_graph
 
-from rebasin.structs import ModuleParameters
 from rebasin.type_definitions import NODE_TYPES
 
 
@@ -49,16 +48,6 @@ def model_change_percent(model1: nn.Module, model2: nn.Module) -> float:
         diff += torch.sum(torch.abs(p1 - p2)).item()
         base += torch.sum(torch.abs(p2)).item()
     return diff / base
-
-
-def path_analysis(path: list[ModuleParameters]) -> str:
-    """Return a string representation of the permutations in a path."""
-    pathstr = ""
-    for mp in path:
-        pathstr += f"{mp.module_type.__name__}"
-        pathstr += f"\n\tin: {mp.input_permutation.perm_indices}"
-        pathstr += f"\n\tout: {mp.output_permutation.perm_indices}"
-    return pathstr
 
 
 def reset_bn_running_stats(model: nn.Module) -> None:

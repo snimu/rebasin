@@ -16,7 +16,6 @@ from tests.fixtures.models import MLP
 from tests.fixtures.utils import (
     allclose,
     model_change_percent,
-    reset_bn_running_stats,
     tensor_diff_perc,
 )
 
