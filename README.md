@@ -169,11 +169,7 @@ It will be interesting to see if this reduces a model's performance, and if so, 
 
 ## Results
 
-Currently, only results from the out-of-date, bug-ridden version of rebasin are available.
-I've moved them to [results-out-of-date.md](results-out-of-date.md), for the sake of 
-completeness. 
-
-Newer results will follow.
+Coming soon
 
 ## Acknowledgements
 

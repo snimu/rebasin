@@ -1,7 +1,0 @@
-vit_b_16:
-    - Full eval set
-    - Contains no BatchNorm layers
-
-mobilenet_v3_large:
-    - Full eval set
-    - BatchNorm layers retrained
