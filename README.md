@@ -55,8 +55,7 @@ input_data = next(iter(train_dl))[0]
 
 # Rebasin
 pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
-pcd.calculate_permutations()
-pcd.apply_permutations()
+pcd.rebasin()
 
 # Interpolate
 lerp = interpolation.LerpSimple(
@@ -95,81 +94,27 @@ via `rebasin.interpolation.LerpSimple`.
 
 ### Limitations of the `PermutationCoordinateDescent`-class
 
-The `PermutationCoordinateDescent`-class only permutes some Modules:
+The `PermutationCoordinateDescent`-class only permutes some Modules. 
+Most modules should work, but others may behave unexpectedly. In this case, 
+you need to add the module to [rebasin/modules.py](rebasin/modules.py);
+make sure it is included in the `initialize_module`-function 
+(preferably by putting it into the `SPECIAL_MODULES`-dict).
 
-For one thing, it only permutes the weights of modules with a `weight`-attribute.
-This means, for example, that `nn.MultiheadAttention` is currently not supported.
-There are plans in place to remedy this, but it will take some time.
+Additionally, the `PermutationCoordinateDescent`-class only works with
+`nn.Module`s, not functions. There is a requirement to have the permuted model
+produce the same output as the un-permuted `Module`, which is a pretty 
+tight constraint. In some models, it isn't a problem at all, but especially in 
+models with lots of short residual blocks, it may (but doesn't have to) be a problem.
+Where it is a problem, few to no parameters get permuted, which defeats the purpose of rebasin.
 
-There is a second limitation, caused by the requirement to have the permuted model
-behave the same as the original model.
-
-`PermutationCoordinateDescent` splits a network into linear paths. 
-This means, for example, that a residual block somewhere in the model
-splits the network into four paths for the purpose of permutation:
-
- 1. The Path up to the residual path.
- 2. The main path in the residual block.
- 3. The shortcut path.
- 4. The path after the residual block.
-
-For each path, the input-permutation of the first module and the output permutation of
-the last module in that path are the identity &mdash; they are not permuted.
-
-This is because **each path needs to permute the weights in it in such a way that the
-total permutation of that path is the identity**. In other words, the permuted model 
-should not change its behavior due to the permutation.
-
-This property limits the number of modules that are permuted. 
-
-Consider the following example:
-
-<p align="center">
-  <img 
-    src="images/vit_b_16_residual_mlp.png" 
-    alt="A residual path including an MLP in ViT_B_16 by torchvision.models" 
-    width="500"
-  />
-</p>
-
-It is a view from the graph of the 
-[`vit_b_16`-model](https://pytorch.org/vision/stable/models/generated/torchvision.models.vit_b_16.html#torchvision.models.vit_b_16) 
-from `torchvision.models` (see [here](images/vit_b_16.pdf) for the graph of the full model). 
-
-In it, the only Modules with weights are the two `Linear`-layers. 
-This means that the only things getting permuted are the output-axis 
-of the weight of the first `Linear`-layer and its bias, and the input-axis of the weight of the second
-layer.
-
-In other words, if we name these two `Linear`-layers `Linear1` and `Linear2`,
-then the rows of `Linear1.weight` (axis 0), the columns of `Linear2.weight` (axis 1), and 
-`Linear1.bias` are permuted.
-
-Only permuting so few parts of the model might lead to a poor rebasing, because `model_b` 
-may be moved only slightly towards `model_a`. 
-
-As a hint to how much this might be the case,
-I applied random permutations to `torchvision.models.vit_b_16` with the weights 
-`torchvision.models.ViT_B_16_Weights.IMAGENET1K_V1`. The above constraints were in place.
-I then calculated the model change (as defined [here](tests/fixtures/utils.py))
-between the original `model_b` and its rebasined version
-It is circa **83.8%**. The output between the original model and the rebasined model
-only changes by **4.3e-7** (**4.3e-5%**, or **0.000043%**), as measured by 
-`(y_orig - y_new).abs().sum() / y_orig.abs().sum()`. 
-
-The output change is very low, as expected.
-However, while the model change is fairly high, it might be interesting to 
-see if it could be brought higher. 
-
-To remedy this second issue, I plan to give `PermutationCoordinateDescent` the option 
-`enforce_identity: bool = True`. If this is set to `False`, then the permutations
-will not be constrained to be the identity at the start and end of each path.
-
-It will be interesting to see if this reduces a model's performance, and if so, by how much.
+For example, @tysam-code's [hlb-gpt](https://github.com/tysam-code/hlb-gpt), a small but fast
+language model implementation, isn't permuted at all. On the other hand,
+`torchvision.models.vit_b_16`, which is similarly a transformer-based model,
+works perfectly fine (and I will probably produce some results for it at some point).
 
 ## Results
 
-Coming soon
+For results, see [rebasin-results](https://github.com/snimu/rebasin-results).
 
 ## Acknowledgements
 
@@ -201,12 +146,26 @@ ImageNet Large Scale Visual Recognition Challenge. arXiv:1409.0575, 2014
 
 **Torchvision models**
 
-For testing, I've used the torchvision models (v.015), of course: 
+For testing, I've used the torchvision models (v.015), of course (or I will): 
 
 https://pytorch.org/vision/0.15/models.html
 
+**HLB-CIFAR10**
+For testing, I forked [hlb-CIFAR10](https://github.com/tysam-code/hlb-CIFAR10) 
+by [@tysam-code](https://github.com/tysam-code):
+
+    cff-version: 1.2.0
+    message: "If you need to cite this codebase for any reason, please do so as below."
+    authors:
+    - family-names: "Balsam"
+      given-names: "Tysam&"
+    title: "hlb-CIFAR10"
+    version: 0.4.0
+    date-released: 2023-02-12
+    url: "https://github.com/tysam-code/hlb-CIFAR10"
+
 **HLB-GPT**
-For testing, I also used [HLB-GPT](https://github.com/tysam-code/hlb-gpt) by @tysam-code: 
+For testing, I also used [hlb-gpt](https://github.com/tysam-code/hlb-gpt) by @tysam-code: 
 
     authors:
       - family-names: "Balsam"
