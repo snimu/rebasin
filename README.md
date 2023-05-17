@@ -123,7 +123,7 @@ Here is a little taste:
     <img
         src="https://github.com/snimu/rebasin-results/blob/main/hlb-CIFAR10/3x3-plot.png"
         alt="hlb-CIFAR10: losses and accuracies of the model"
-        width="400"
+        width="600"
     />
 </p>
 
