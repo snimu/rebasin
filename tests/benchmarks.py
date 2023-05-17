@@ -220,7 +220,7 @@ class BenchmarkPermutationCoordinateDescent:
                 model_b=model_b,
                 input_data_b=torch.randn(1, 3, 224, 224, device="cuda"),
                 input_data_a=torch.randn(1, 3, 224, 224, device="cpu"),
-                verbose=True,
+                logging_level="info",
                 device_a="cpu",
                 device_b="cuda"
             )
