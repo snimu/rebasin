@@ -23,6 +23,14 @@ Can be applied to **arbitrary models**, without modification.
 - [Acknowledgements](#acknowledgements)
 
 ## Installation
+
+Requires [torchview](https://github.com/mert-kurttutan/torchview), which in turn
+requires graphviz. If you don't know how to install either, look at 
+[torchview's installation instructions](https://github.com/mert-kurttutan/torchview#installation).
+They are good!
+
+Right now, rebasin is only on PyPI, so you can install it with pip:
+
 ```bash
 pip install rebasin
 ```
@@ -110,9 +118,25 @@ models with lots of short residual blocks, it may (but doesn't have to) be a pro
 Where it is a problem, few to no parameters get permuted, which defeats the purpose of rebasin.
 
 For example, @tysam-code's [hlb-gpt](https://github.com/tysam-code/hlb-gpt), a small but fast
-language model implementation, isn't permuted at all. On the other hand,
-`torchvision.models.vit_b_16`, which is similarly a transformer-based model,
-works perfectly fine (and I will probably produce some results for it at some point).
+language model implementation, isn't permuted at all. 
+Vision transformers like `torchvision.models.vit_b_16` have only very few permutations
+applied to them. In general, **transformer models don't work well**, because they 
+reshape the input-tensor, and directly follow that up with residual blocks. 
+This means that almost nothing of the model can be permuted 
+(a single Linear layer between the reshaping and the first residual block would fix that,
+but this isn't usually done...).
+
+On the other hand, **CNNs usually work very well**.
+
+If you are unsure, you can always print the model-graph! To do so, write:
+
+```python
+from rebasin import PermutationCoordinateDescent
+
+
+pcd = PermutationCoordinateDescent(...)
+print(pcd.pinit.model_graph)
+```
 
 ## Results
 
