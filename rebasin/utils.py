@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from collections.abc import Iterator, Sequence
 from typing import Any
 
@@ -235,3 +236,33 @@ def pairwise(iterable: Sequence[Any]) -> Iterator[tuple[Any, Any]]:
         a, b = itertools.tee(iterable)
         next(b, None)
         return zip(a, b)
+
+
+def parse_logging_level(logging_level: int | str) -> int:
+    err_msg = (
+        "logging_level must be one of "
+        "loggin.DEBUG, logging.INFO, logging.WARNING, loggin.WARN, logging.ERROR, "
+        "logging.CRITICAL, logging.FATAL, "
+        "'DEBUG', 'INFO', 'WARNING', 'WARN', 'ERROR', 'CRITICAL', 'FATAL' "
+        "'debug', 'info', 'warning', 'warn', 'error', 'critical', 'fatal',"
+        "10, 20, 30, 40, 50."
+    )
+    if isinstance(logging_level, int):
+        assert logging_level in [
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.FATAL
+        ], err_msg
+        return logging_level
+    if isinstance(logging_level, str):
+        assert logging_level in [
+            "DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL", "FATAL",
+            "debug", "info", "warnings", "warn", "error", "critical", "fatal"
+        ], err_msg
+        return getattr(  # type: ignore[no-any-return]
+            logging, logging_level.upper()
+        )
+    else:
+        raise TypeError("logging_level must be an int or a str.")

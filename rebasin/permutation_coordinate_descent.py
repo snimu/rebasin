@@ -9,6 +9,7 @@ from scipy.optimize import linear_sum_assignment  # type: ignore[import]
 from torch import nn
 from tqdm import tqdm
 
+from rebasin import utils
 from rebasin.modules import Permutation, PermutationInfo  # type: ignore[attr-defined]
 from rebasin.permutation_initializer import PermutationInitializer
 
@@ -141,7 +142,7 @@ class PermutationCoordinateDescent:
         self.model_b = model_b
         self.device_a = device_a
         self.device_b = device_b
-        self.logging_level = self._parse_logging_level(logging_level)
+        self.logging_level = utils.parse_logging_level(logging_level)
 
         if self.logging_level <= logging.INFO:
             print("Initializing permutations...")
@@ -153,36 +154,6 @@ class PermutationCoordinateDescent:
 
         if self.logging_level <= logging.INFO:
             print("Done.")
-
-    @staticmethod
-    def _parse_logging_level(logging_level: int | str) -> int:
-        err_msg = (
-            "logging_level must be one of "
-            "loggin.DEBUG, logging.INFO, logging.WARNING, loggin.WARN, logging.ERROR, "
-            "logging.CRITICAL, logging.FATAL, "
-            "'DEBUG', 'INFO', 'WARNING', 'WARN', 'ERROR', 'CRITICAL', 'FATAL' "
-            "'debug', 'info', 'warning', 'warn', 'error', 'critical', 'fatal',"
-            "10, 20, 30, 40, 50."
-        )
-        if isinstance(logging_level, int):
-            assert logging_level in [
-                logging.DEBUG,
-                logging.INFO,
-                logging.WARNING,
-                logging.ERROR,
-                logging.FATAL
-            ], err_msg
-            return logging_level
-        if isinstance(logging_level, str):
-            assert logging_level in [
-                "DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL", "FATAL",
-                "debug", "info", "warnings", "warn", "error", "critical", "fatal"
-            ], err_msg
-            return getattr(  # type: ignore[no-any-return]
-                logging, logging_level.upper()
-            )
-        else:
-            raise TypeError("logging_level must be an int or a str.")
 
     def rebasin(self, max_iterations: int = 100) -> None:
         """

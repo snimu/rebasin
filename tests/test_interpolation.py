@@ -157,13 +157,29 @@ class TestInterpolation(BaseClass):
                 savedir=None
             )
 
-    def test_sanity_checks_verbose(self) -> None:
+    def test_sanity_checks_logging_level(self) -> None:
+        with pytest.raises(TypeError):
+            interp.Interpolation(
+                models=self.models,
+                eval_fn=self.eval_fn,
+                eval_mode="min",
+                logging_level=10.2  # type: ignore[arg-type]
+            )
+
         with pytest.raises(AssertionError):
             interp.Interpolation(
                 models=self.models,
                 eval_fn=self.eval_fn,
                 eval_mode="min",
-                verbose="not a bool"  # type: ignore[arg-type]
+                logging_level="lalalalala"
+            )
+
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                eval_fn=self.eval_fn,
+                eval_mode="min",
+                logging_level=-1
             )
 
 
