@@ -237,7 +237,8 @@ class ParallelPaths:
         if not bool(self):
             return None
         perms = [path.input_permutation for path in self if bool(path)]
-        if not all(perm is perms[0] for perm in perms):
+        shapes = [path.input_permutation_shape for path in self if bool(path)]
+        if not all(shape is shapes[0] for shape in shapes):
             return None
         return perms[0]
 

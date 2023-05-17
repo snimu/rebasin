@@ -205,14 +205,12 @@ class TestParallelPaths(PathSource):
 
     def test_input_permutation(self) -> None:
         _, path = self.dense_parallel_path_with_empty_path()
-        assert path.input_permutation is None
         path.input_permutation = Permutation(torch.randperm(10))
         assert isinstance(path.input_permutation, Permutation)
         path.input_permutation = None
         assert path.input_permutation is None
 
         _, path = self.dense_parallel_path_diff_shapes()
-        assert path.input_permutation is None
         path.input_permutation = Permutation(torch.randperm(10))
 
         assert path.input_permutation is None
