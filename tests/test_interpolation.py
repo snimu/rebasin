@@ -131,30 +131,13 @@ class TestInterpolation(BaseClass):
                 input_indices=["not", "an", "int"]  # type: ignore[list-item]
             )
 
-    def test_sanity_checks_save_vars(self) -> None:
+    def test_sanity_checks_savedir(self) -> None:
         with pytest.raises(AssertionError):
             interp.Interpolation(
                 models=self.models,
                 eval_fn=self.eval_fn,
                 eval_mode="min",
                 savedir=0  # type: ignore[arg-type]
-            )
-
-        with pytest.raises(AssertionError):
-            interp.Interpolation(
-                models=self.models,
-                eval_fn=self.eval_fn,
-                eval_mode="min",
-                save_all="not a bool"  # type: ignore[arg-type]
-            )
-
-        with pytest.raises(AssertionError):
-            interp.Interpolation(
-                models=self.models,
-                eval_fn=self.eval_fn,
-                eval_mode="min",
-                save_all=True,
-                savedir=None
             )
 
     def test_sanity_checks_logging_level(self) -> None:

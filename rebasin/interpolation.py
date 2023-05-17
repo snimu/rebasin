@@ -96,10 +96,10 @@ class Interpolation:
         savedir:
             The directory to save the models in.
             If :code:`None`, the models are not saved.
+            Otherwise, the interpolated models are saved in the given directory.
 
-        save_all:
-            If :code:`True`, all models are saved,
-            if :code:`False`, only the best model is saved.
+            Type: :class:`pathlib.Path` or :class:`str` or :code:`None`.
+            Default: :code:`None`.
 
         logging_level:
             The logging level to use.
@@ -129,7 +129,6 @@ class Interpolation:
             device_interp: torch.device | str | None = None,
             input_indices: Sequence[int] | int = 0,
             savedir: Path | str | None = None,
-            save_all: bool = False,
             logging_level: int | str = "ERROR"
     ) -> None:
         self._sanity_checks(
@@ -141,7 +140,6 @@ class Interpolation:
             device_interp,
             input_indices,
             savedir,
-            save_all,
         )
         self.logging_level = parse_logging_level(logging_level)
         if self.logging_level <= logging.INFO:
@@ -162,7 +160,6 @@ class Interpolation:
         self.device_interp = device_interp
         self.input_indices = input_indices
         self.savedir = savedir
-        self.save_all = save_all
 
         if self.logging_level <= logging.INFO:
             print("Evaluating given models...")
@@ -183,12 +180,7 @@ class Interpolation:
         self.best_model = self.models[best_idx]
         self.best_model_name = f"model_{best_idx}.pt"
 
-    def interpolate(
-            self,
-            steps: int = 20,
-            savedir: str | Path | None = None,
-            save_all: bool = False
-    ) -> None:
+    def interpolate(self, steps: int = 20, savedir: str | Path | None = None) -> None:
         """Interpolate between the models and save the best one or all."""
 
     @staticmethod
@@ -201,7 +193,6 @@ class Interpolation:
             device_interp: torch.device | str | None,
             input_indices: Sequence[int] | int,
             savedir: Path | str | None,
-            save_all: bool = False,
     ) -> None:
         assert isinstance(models, Sequence), "Models must be a sequence"
         assert all(isinstance(model, nn.Module) for model in models), \
@@ -227,12 +218,8 @@ class Interpolation:
             assert all(isinstance(i, int) for i in input_indices)
 
         assert isinstance(savedir, (Path, str, type(None)))
-        assert isinstance(save_all, bool)
 
         assert len(models) > 1, "Need at least two models to interpolate between"
-
-        if save_all:
-            assert savedir is not None
 
 
 class LerpSimple(Interpolation):
@@ -268,15 +255,10 @@ class LerpSimple(Interpolation):
     For args, see :class:`Interpolation`.
     """
 
-    def interpolate(
-            self,
-            steps: int = 20,
-            savedir: str | Path | None = None,
-            save_all: bool | None = None
-    ) -> None:
+    def interpolate(self, steps: int = 20, savedir: str | Path | None = None) -> None:
         r"""
-        Interpolate between the models and save the best one or all
-        in :code:`self.best_model`.
+        Interpolate between the models and save the interpolated models
+        in :code:`self.best_model` if :code:`savedir` is given.
 
         Args:
             steps:
@@ -285,29 +267,17 @@ class LerpSimple(Interpolation):
             savedir:
                 The directory to save the models in. Overwrites the :code:`savedir`
                 argument passed to the constructor if not None.
-                If both are :code:`None`, the models are not saved.
+                If both are :code:`None`, the interpolated models are not saved.
 
                 If :code:`not None`, the following naming schema is used for the files:
 
-                - :code:`"model_{model_num}.pt"`
-                    if the model is one of the original models.
-                    :code:`model_num` is the index of the model
-                    in the :code:`models` argument.
-                    The original models are not saved, except the best model.
-
-                - :code:`"interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt"`
-                  if the model is interpolated.
-                  :math:`m_i` and :math:`m_{i+1}` are the indices of the models
-                  between which the interpolation is done.
-                  `percentage` is the percentage of the way through the interpolation.
-                  If it is small, the model is closer to :math:`m_i`,
-                  and if it is large, the model is closer to :math:`m_{i+1}`.
-
-            save_all:
-                Whether to save all interpolated models, or just the best one.
-                The best model is saved either way if a `savedir` is given.
-                Overwrites the `save_all` argument passed to the constructor
-                if not None.
+                :code:`"interp_models_{m_i}_{m_i+1}_perc_{percentage}.pt"`
+                if the model is interpolated.
+                :math:`m_i` and :math:`m_{i+1}` are the indices of the models
+                between which the interpolation is done.
+                `percentage` is the percentage of the way through the interpolation.
+                If it is small, the model is closer to :math:`m_i`,
+                and if it is large, the model is closer to :math:`m_{i+1}`.
         """
         # SANITY CHECKS AND DEFAULT SETTINGS
         assert isinstance(savedir, (Path, str, type(None)))
@@ -315,11 +285,6 @@ class LerpSimple(Interpolation):
             savedir = self.savedir
         elif isinstance(savedir, str):
             savedir = Path(savedir)
-
-        if save_all is None:
-            save_all = self.save_all
-
-        assert isinstance(save_all, bool)
 
         if self.logging_level <= logging.INFO:
             print("Interpolating between models...")
@@ -331,28 +296,9 @@ class LerpSimple(Interpolation):
             # (steps + 2) so that it never ends at 100 percent.
             # This is because the start and end models already exist
             percentage = (step + 1) / (steps + 2)
-            self._interpolate_step(
-                percentage=percentage, savedir=savedir, save_all=save_all
-            )
+            self._interpolate_step(percentage=percentage, savedir=savedir)
 
-        # SAVE THE BEST MODEL
-        # If all interpolated models are saved and the best model is interpolated,
-        #   it is unnecessary to save it again.
-        # Conversely, if not all interpolated models are saved, the best model
-        #   must be saved.
-        # Alternatively, save_all only leads to interpolated models being saved,
-        #   so the best model must be saved again if it is not interpolated.
-        save_best_model = (not save_all) or (self.best_model in self.models)
-
-        if save_best_model and (savedir is not None):
-            torch.save(
-                self.best_model.state_dict(),
-                savedir.joinpath(self.best_model_name)
-            )
-
-    def _interpolate_step(
-            self, percentage: float, savedir: Path | None, save_all: bool
-    ) -> None:
+    def _interpolate_step(self, percentage: float, savedir: Path | None) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
                 zip(self.models[:-1], self.models[1:])
@@ -398,5 +344,5 @@ class LerpSimple(Interpolation):
                 self.best_model = model_interp
                 self.best_model_name = filename  # for later saving if not save_all
 
-            if savedir is not None and save_all:
+            if savedir is not None:
                 torch.save(model_interp.state_dict(), savedir.joinpath(filename))
