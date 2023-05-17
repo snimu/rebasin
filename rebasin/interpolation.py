@@ -35,11 +35,10 @@ class Interpolation:
 
             Its signature must be as follows:
 
-            .. code-block:: python
-                dev eval_fn(
-                    model: nn.Module, device: torch.device | str | None
-                ) -> float:
-                    ...
+                >>> def eval_fn(
+                >>>     model: nn.Module, device: torch.device | str | None
+                >>> ) -> float:
+                >>>     ...
 
             The :code:`model` argument is necessary
             because different models will have to be
@@ -107,15 +106,15 @@ class Interpolation:
 
             Can be any of the following:
 
-            - :code:`logging.DEBUG` / :code:`'DEBUG'` / :code:`'debug'` / :code:`10`
-            - :code:`logging.INFO` / :code:`'INFO'` / :code:`'info'` / :code:`20`
-            - :code:`logging.WARNING` / :code:`'WARNING'`
-              / :code:`'warning'` / :code:`30`
-            - :code:`logging.WARN`  / :code:`'WARN'` / :code:`'warn'` / :code:`30`
-            - :code:`logging.ERROR` / :code:`'ERROR'` / :code:`'error'` / :code:`40`
-            - :code:`logging.CRITICAL` / :code:`'CRITICAL'`
-              / :code:`'critical'` / :code:`50`
-            - :code:`logging.FATAL` / :code:`'FATAL'` / :code:`'fatal'` / :code:`50`
+            - :code:`logging.DEBUG` / :code:`"DEBUG"` / :code:`"debug"` / :code:`10`
+            - :code:`logging.INFO` / :code:`"INFO"` / :code:`"info"` / :code:`20`
+            - :code:`logging.WARNING` / :code:`"WARNING"`
+              / :code:`"warning"` / :code:`30`
+            - :code:`logging.WARN`  / :code:`"WARN"` / :code:`"warn"` / :code:`30`
+            - :code:`logging.ERROR` / :code:`"ERROR"` / :code:`"error"` / :code:`40`
+            - :code:`logging.CRITICAL` / :code:`"CRITICAL"`
+              / :code:`"critical"` / :code:`50`
+            - :code:`logging.FATAL` / :code:`"FATAL"` / :code:`"fatal"` / :code:`50`
 
             Type: int.
             Default: :code:`logging.ERROR`.
