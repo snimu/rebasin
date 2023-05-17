@@ -26,6 +26,8 @@ class Interpolation:
             The models to interpolate between.
             This can be multiple models (see explanation above).
 
+            *Type:* :code:`Sequence[nn.Module]`
+
         eval_fn:
             The function to evaluate the models with.
             Usually, this simply calculates the loss for every batch in a
@@ -46,9 +48,22 @@ class Interpolation:
             models can be evaluated on different devices
             (see the :code:`devices` argument).
 
+            If the default :code:`eval_fn` is used, then the best model will always be
+            :code:`models[0]`, and all metrics will be :code:`0.0`.
+            In this case, it is recommended to provide a :code:`savedir`
+            so that the interpolated models are saved and can be evaluated manually.
+
+            *Type:* Callable[[nn.Module, torch.device | str | None], float]
+
+            *Default:* :code:`lambda model, device: 0.0`
+
         eval_mode:
             The mode to use for evaluation. If "min", the model with the lowest
             metric is chosen, if "max", the model with the highest metric is chosen.
+
+            *Type:* :code:`str`
+
+            *Default:* :code:`"min"`
 
         train_dataloader:
             The dataloader to use for training the models.
@@ -60,6 +75,10 @@ class Interpolation:
             This is unfortunately strongly recommended if your model includes
             these statistics.
 
+            *Type:* :class:`torch.utils.data.DataLoader | None`
+
+            *Default:* :code:`None`
+
         devices:
             Models may need a large amount of GPU-memory.
             To avoid running out of memory,
@@ -68,12 +87,20 @@ class Interpolation:
             As each model is evaluated using the function given in :code:`eval_fn`,
             the corresponding device is passed to :code:`eval_fn` as well.
 
+            *Type:* :code:`Sequence[torch.device | str | None] | None`
+
+            *Default:* :code:`None`
+
         device_interp:
             The device to use for the interpolation.
             If this is :code:`None`, no parameter will be moved
             to a different device for interpolation, and the
             interpolated model will be created on CPU.
             Again, this argument is useful for saving on memory.
+
+            *Type:* :code:`torch.device | str | None`
+
+            *Default:* :code:`None`
 
         input_indices:
             If a training dataloader is given to :code:`train_dataloader`,
@@ -93,12 +120,17 @@ class Interpolation:
             indices given here will be used as inputs to the models to
             recalculate the :code:`running_mean` and :code:`running_var`
 
+            *Type:* :code:`Sequence[int] | int`
+
+            *Default:* :code:`0`
+
         savedir:
             The directory to save the models in.
             If :code:`None`, the models are not saved.
             Otherwise, the interpolated models are saved in the given directory.
 
             Type: :class:`pathlib.Path` or :class:`str` or :code:`None`.
+
             Default: :code:`None`.
 
         logging_level:
@@ -117,12 +149,13 @@ class Interpolation:
             - :code:`logging.FATAL` / :code:`"FATAL"` / :code:`"fatal"` / :code:`50`
 
             Type: int.
+
             Default: :code:`logging.ERROR`.
     """
     def __init__(
             self,
             models: Sequence[torch.nn.Module],
-            eval_fn: Any,
+            eval_fn: Any = lambda model, device: 0.0,
             eval_mode: str = "min",
             train_dataloader: DataLoader[Any] | None = None,
             devices: Sequence[torch.device | str] | None = None,
