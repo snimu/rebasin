@@ -79,8 +79,8 @@ In this document, I will use the following terminology:
     permuting the rows and columns of its weights (and biases)
 - `model_a`: The model that stays unchanged
 - `model_b`: The model that is changed by rebasin it towards `model_a`
-    - `model_b_orig` for the unchanged, original `model_b`
-    - `model_b_rebasin` for the changed, rebasined `model_b`
+    - `model_b (original)` for the unchanged, original `model_b`
+    - `model_b (rebasin)` for the changed, rebasined `model_b`
 - **Path**: A linear sequence of modules in a model
 
 ## Limitations
@@ -126,6 +126,8 @@ Here is a little taste:
         width="600"
     />
 </p>
+
+It seems to work!
 
 ## Acknowledgements
 
