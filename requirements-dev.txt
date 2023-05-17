@@ -6,3 +6,4 @@ mypy
 pre-commit
 torchvision
 matplotlib
+pandas

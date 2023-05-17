@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import argparse
 import copy
-import csv
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
+import pandas as pd  # type: ignore[import]
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -21,6 +21,7 @@ from rebasin import PermutationCoordinateDescent
 from rebasin.interpolation import LerpSimple
 from rebasin.utils import recalculate_batch_norms
 from tests.fixtures.mandw import MODEL_NAMES, MODELS_AND_WEIGHTS
+from tests.fixtures.utils import accuracy
 
 
 class TorchvisionEval:
@@ -109,22 +110,21 @@ class TorchvisionEval:
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
 
-        self.train_dl_a = DataLoader(  # Download the data
-            CIFAR10(root=self.root_dir, train=True, download=True)
-        )
-        self.train_dl_b = DataLoader(
-            CIFAR10(root=self.root_dir, train=True, download=False)
-        )
-        self.val_dl_a = DataLoader(
-            CIFAR10(root=self.root_dir, train=False, download=False)
-        )
-        self.val_dl_b = DataLoader(
-            CIFAR10(root=self.root_dir, train=False, download=False)
-        )
+        if self.hparams.verbose:
+            print("Setting dataloaders...")
+        self.set_dataloaders()
+        if self.hparams.verbose:
+            print("Done.")
+
+        self.accuracies1: list[float] = []
+        self.accuracies5: list[float] = []
+        self.losses: list[float] = []
 
     def eval_fn(self, model: nn.Module, device: str | torch.device) -> float:
         losses: list[float] = []
         loss_fn = nn.CrossEntropyLoss()
+        accuracies1: list[float] = []
+        accuracies5: list[float] = []
         val_dl = self.val_dl_a if model is self.model_a else self.val_dl_b
         iters = self.hparams.percent_eval * len(val_dl) / self.hparams.batch_size
 
@@ -137,7 +137,14 @@ class TorchvisionEval:
             outputs = model(inputs)
             loss = loss_fn(outputs, labels)
             losses.append(loss.item())
-        return sum(losses) / len(losses)
+            accuracies1.append(*accuracy(outputs, labels, topk=(1,)))
+            accuracies5.append(*accuracy(outputs, labels, topk=(5,)))
+
+        self.accuracies1.append(sum(accuracies1) / len(accuracies1))
+        self.accuracies5.append(sum(accuracies5) / len(accuracies5))
+        avg_loss = sum(losses) / len(losses)
+        self.losses.append(avg_loss)
+        return avg_loss
 
     def measure_weight_matching(
             self, constructor: Any, weights_a: Any, weights_b: Any, verbose: bool
@@ -145,16 +152,14 @@ class TorchvisionEval:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
         if verbose:
-            print("Setting up DataLoaders...")
-        self.set_dataloaders(weights_a, weights_b)
+            print("Setting up transforms...")
+        self.set_transforms(weights_a, weights_b)
 
         if verbose:
             print("Setting up models...")
-        self.model_a = constructor(weights=weights_a).to(device)
-        self.model_b = constructor(weights=weights_b).to(device)
+        self.model_a = constructor(weights=weights_a).eval().to(device)
+        self.model_b = constructor(weights=weights_b).eval().to(device)
 
-        # They are trained on ImageNet but evaluated on CIFAR10 here
-        #   -> recalculate the BatchNorms
         if (
                 not self.hparams.ignore_bn
                 and self.hparams.dataset != "imagenet"  # already trained on imagenet
@@ -166,9 +171,26 @@ class TorchvisionEval:
 
         self.original_model_b = copy.deepcopy(self.model_b)
 
-        results: dict[str, list[float]] = {
+        losses: dict[str, list[float]] = {
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
         }
+        accuracies1: dict[str, list[float]] = {
+            "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
+        }
+        accuracies5: dict[str, list[float]] = {
+            "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
+        }
+        self.eval_fn(self.model_a, device)
+        self.eval_fn(self.model_b, device)
+        ma_loss = self.losses[0]
+        mb_orig_loss = self.losses[1]
+        ma_acc1 = self.accuracies1[0]
+        ma_acc5 = self.accuracies5[0]
+        mb_orig_acc1 = self.accuracies1[1]
+        mb_orig_acc5 = self.accuracies5[1]
+        self.losses.clear()
+        self.accuracies1.clear()
+        self.accuracies5.clear()
 
         # Rebasin
         if verbose:
@@ -181,8 +203,7 @@ class TorchvisionEval:
             device_b=device,
             logging_level=logging.INFO if verbose else logging.ERROR
         )
-        rebasin.calculate_permutations()
-        rebasin.apply_permutations()
+        rebasin.rebasin()
         if not self.hparams.ignore_bn:
             recalculate_batch_norms(
                 self.model_b,
@@ -191,6 +212,14 @@ class TorchvisionEval:
                 device=device,
                 verbose=verbose
             )
+
+        self.eval_fn(self.model_b, device)
+        mb_rebasin_loss = self.losses[0]
+        mb_rebasin_acc1 = self.accuracies1[0]
+        mb_rebasin_acc5 = self.accuracies5[0]
+        self.losses.clear()
+        self.accuracies1.clear()
+        self.accuracies5.clear()
 
         if verbose:
             print("Interpolate between model_a and model_b (original weights)")
@@ -205,9 +234,9 @@ class TorchvisionEval:
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
-        results["a_b_original"] = lerp.metrics_interpolated
-        loss_a = lerp.metrics_models[0]
-        loss_b_original = lerp.metrics_models[1]
+        losses["a_b_original"] = [ma_loss, *self.losses] + [mb_orig_loss]
+        accuracies1["a_b_original"] = [ma_acc1, *self.accuracies1] + [mb_orig_acc1]
+        accuracies5["a_b_original"] = [ma_acc5, *self.accuracies5] + [mb_orig_acc5]
 
         # Interpolate between models with rebasin
         if verbose:
@@ -221,8 +250,9 @@ class TorchvisionEval:
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
-        results["a_b_rebasin"] = lerp.metrics_interpolated
-        loss_b_rebasin = lerp.metrics_models[1]
+        losses["a_b_rebasin"] = [ma_loss, *self.losses] + [mb_rebasin_loss]
+        accuracies1["a_b_rebasin"] = [ma_acc1, *self.accuracies1] + [mb_rebasin_acc1]
+        accuracies5["a_b_rebasin"] = [ma_acc5, *self.accuracies5] + [mb_rebasin_acc5]
 
         # Interpolate between original and rebasin models
         if verbose:
@@ -236,41 +266,32 @@ class TorchvisionEval:
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
-        results["b_original_b_rebasin"] = lerp.metrics_interpolated
+        losses["b_original_b_rebasin"] = \
+            [mb_orig_loss, *self.losses] + [mb_rebasin_loss]
+        accuracies1["b_original_b_rebasin"] = \
+            [mb_orig_acc1, *self.accuracies1] + [mb_rebasin_acc1]
+        accuracies5["b_original_b_rebasin"] = \
+            [mb_orig_acc5, *self.accuracies5] + [mb_rebasin_acc5]
 
         # Save results
-        # csv saves rows; have to manually transpose
         if verbose:
             print("\nSaving results...")
-        rows = [
-            ["model", *list(results.keys())],
-            ("start", loss_a, loss_a, loss_b_original)
-        ]
-
-        i = 1
-        for l1, (l2, l3) in zip(
-                results["a_b_original"],
-                zip(results["a_b_rebasin"], results["b_original_b_rebasin"])
-        ):
-            rows.append([f"interpolated_{i}", l1, l2, l3])
-            i += 1
-
-        rows.append(("end", loss_b_original, loss_b_rebasin, loss_b_rebasin))
-
         savefile = os.path.join(self.results_dir, f"{constructor.__name__}.csv")
-        with open(savefile, "w") as f:
-            writer = csv.writer(f)
-            writer.writerows(rows)
+        df_losses = pd.DataFrame(losses)
+        df_accuracies1 = pd.DataFrame(accuracies1)
+        df_accuracies5 = pd.DataFrame(accuracies5)
+        df_losses.to_csv(savefile.replace(".csv", "_losses.csv"))
+        df_accuracies1.to_csv(savefile.replace(".csv", "_accuracies1.csv"))
+        df_accuracies5.to_csv(savefile.replace(".csv", "_accuracies5.csv"))
 
-    def set_dataloaders(self, weights_a: Any, weights_b: Any) -> None:
+        if verbose:
+            print("Done")
+
+    def set_dataloaders(self) -> None:
         if self.hparams.dataset == "cifar10":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_datasets(
-                weights_a, weights_b
-            )
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_datasets()
         elif self.hparams.dataset == "imagenet":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_datasets(
-                weights_a, weights_b
-            )
+            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_datasets()
         else:
             raise ValueError(f"Unknown dataset {self.hparams.dataset}")
 
@@ -299,59 +320,61 @@ class TorchvisionEval:
             batch_size=self.hparams.batch_size,
         )
 
-    def get_cifar10_datasets(
-            self, weights_a: Any, weights_b: Any
-    ) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
+    def get_cifar10_datasets(self) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
         train_ds_a = CIFAR10(
             root=self.root_dir,
             train=True,
             download=False,
-            transform=weights_a.transforms()
         )
         train_ds_b = CIFAR10(
             root=self.root_dir,
             train=True,
             download=False,
-            transform=weights_b.transforms()
         )
         val_ds_a = CIFAR10(
             root=self.root_dir,
             train=False,
             download=False,
-            transform=weights_a.transforms()
         )
         val_ds_b = CIFAR10(
             root=self.root_dir,
             train=False,
             download=False,
-            transform=weights_b.transforms()
         )
         return train_ds_a, train_ds_b, val_ds_a, val_ds_b
 
-    def get_imagenet_datasets(
-            self, weights_a: Any, weights_b: Any
-    ) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
+    def get_imagenet_datasets(self) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
         train_ds_a = ImageNet(
             root=self.root_dir,
             split="train",
-            transform=weights_a.transforms()
         )
         train_ds_b = ImageNet(
             root=self.root_dir,
             split="train",
-            transform=weights_b.transforms()
         )
         val_ds_a = ImageNet(
             root=self.root_dir,
             split="val",
-            transform=weights_a.transforms()
         )
         val_ds_b = ImageNet(
             root=self.root_dir,
             split="val",
-            transform=weights_b.transforms()
         )
         return train_ds_a, train_ds_b, val_ds_a, val_ds_b
+
+    def set_transforms(self, weights_a: Any, weights_b: Any) -> None:
+        self.train_dl_a.dataset.transform = (  # type: ignore[attr-defined]
+            weights_a.transforms()
+        )
+        self.train_dl_b.dataset.transform = (  # type: ignore[attr-defined]
+            weights_b.transforms()
+        )
+        self.val_dl_a.dataset.transform = (  # type: ignore[attr-defined]
+            weights_a.transforms()
+        )
+        self.val_dl_b.dataset.transform = (  # type: ignore[attr-defined]
+            weights_b.transforms()
+        )
 
     def run(self) -> None:
         """Run the evaluation.

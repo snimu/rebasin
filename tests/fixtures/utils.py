@@ -80,3 +80,30 @@ def modules_and_module_nodes(
     node: ModuleNode = nodes[0]  # type: ignore[assignment]
     assert isinstance(node, ModuleNode)
     return module_a, module_b, node
+
+
+def accuracy(
+        output: torch.Tensor, target: torch.Tensor, topk: tuple[int, ...] = (1,)
+) -> list[float]:
+    """
+    Computes the accuracy over the k top predictions for the specified values of k.
+
+    Directly taken from
+    https://github.com/pytorch/vision/blob/main/references/classification/utils.py#L173
+    on May 17th 2023.
+    """
+    with torch.inference_mode():  # type: ignore[no-untyped-call]
+        maxk = max(topk)
+        batch_size = target.size(0)
+        if target.ndim == 2:
+            target = target.max(dim=1)[1]
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target[None])
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].flatten().sum(dtype=torch.float32)
+            res.append(correct_k * (100.0 / batch_size))
+        return res
