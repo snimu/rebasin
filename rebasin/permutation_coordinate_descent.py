@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import Any
 
 import torch
@@ -108,11 +109,23 @@ class PermutationCoordinateDescent:
 
             Type: torch.device | str | None.
             Default: None.
-        verbose:
-            If True, progress will be printed to the console.
+        logging_level:
+            The logging level to use.
 
-            Type: bool.
-            Default: False.
+            Can be any of the following:
+
+            - :code:`logging.DEBUG` / :code:`'DEBUG'` / :code:`'debug'` / :code:`10`
+            - :code:`logging.INFO` / :code:`'INFO'` / :code:`'info'` / :code:`20`
+            - :code:`logging.WARNING` / :code:`'WARNING'`
+              / :code:`'warning'` / :code:`30`
+            - :code:`logging.WARN`  / :code:`'WARN'` / :code:`'warn'` / :code:`30`
+            - :code:`logging.ERROR` / :code:`'ERROR'` / :code:`'error'` / :code:`40`
+            - :code:`logging.CRITICAL` / :code:`'CRITICAL'`
+              / :code:`'critical'` / :code:`50`
+            - :code:`logging.FATAL` / :code:`'FATAL'` / :code:`'fatal'` / :code:`50`
+
+            Type: int.
+            Default: :code:`logging.ERROR`.
     """
 
     def __init__(
@@ -123,14 +136,14 @@ class PermutationCoordinateDescent:
             input_data_a: Any | None = None,
             device_a: torch.device | str | None = None,
             device_b: torch.device | str | None = None,
-            verbose: bool = False,
+            logging_level: int | str = logging.ERROR,
     ) -> None:
         self.model_b = model_b
         self.device_a = device_a
         self.device_b = device_b
-        self.verbose = verbose
+        self.logging_level = self._parse_logging_level(logging_level)
 
-        if verbose:
+        if self.logging_level <= logging.INFO:
             print("Initializing permutations...")
 
         self.pinit = PermutationInitializer(
@@ -138,8 +151,38 @@ class PermutationCoordinateDescent:
         )
         self.pinit.model_graph.enforce_identity()
 
-        if verbose:
+        if self.logging_level <= logging.INFO:
             print("Done.")
+
+    @staticmethod
+    def _parse_logging_level(logging_level: int | str) -> int:
+        err_msg = (
+            "logging_level must be one of "
+            "loggin.DEBUG, logging.INFO, logging.WARNING, loggin.WARN, logging.ERROR, "
+            "logging.CRITICAL, logging.FATAL, "
+            "'DEBUG', 'INFO', 'WARNING', 'WARN', 'ERROR', 'CRITICAL', 'FATAL' "
+            "'debug', 'info', 'warning', 'warn', 'error', 'critical', 'fatal',"
+            "10, 20, 30, 40, 50."
+        )
+        if isinstance(logging_level, int):
+            assert logging_level in [
+                logging.DEBUG,
+                logging.INFO,
+                logging.WARNING,
+                logging.ERROR,
+                logging.FATAL
+            ], err_msg
+            return logging_level
+        if isinstance(logging_level, str):
+            assert logging_level in [
+                "DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL", "FATAL",
+                "debug", "info", "warnings", "warn", "error", "critical", "fatal"
+            ], err_msg
+            return getattr(  # type: ignore[no-any-return]
+                logging, logging_level.upper()
+            )
+        else:
+            raise TypeError("logging_level must be an int or a str.")
 
     def rebasin(self, max_iterations: int = 100) -> None:
         """
@@ -164,14 +207,14 @@ class PermutationCoordinateDescent:
                 The maximum number of iterations.
         """
         # Calculate the permutations
-        if self.verbose:
+        if self.logging_level <= logging.INFO:
             print("Calculating permutations...")
 
-        loop = tqdm(range(max_iterations), disable=not self.verbose)
+        loop = tqdm(range(max_iterations), disable=self.logging_level > logging.INFO)
         for iteration in loop:
             progress = self._calculate_permutations_step(loop)
             if not progress:
-                if self.verbose:
+                if self.logging_level <= logging.INFO:
                     print(f"Stopping early after {iteration + 1} steps.")
                 break
 
@@ -194,7 +237,7 @@ class PermutationCoordinateDescent:
             n = len(perm.perm_indices)
             cost_tensor = torch.zeros((n, n)).to(self.device_b)
 
-            if self.verbose:
+            if self.logging_level == logging.DEBUG:
                 loop.write("Calculating cost tensor...")
             for perm_info in perm_infos:
                 # Copy so that the original parameter isn't moved to device_b.
@@ -239,7 +282,7 @@ class PermutationCoordinateDescent:
                 #   as similar as possible between the two.
                 cost_tensor += w_a @ w_b
 
-            if self.verbose:
+            if self.logging_level == logging.DEBUG:
                 loop.write(f"Done. Cost matrix shape: {cost_tensor.shape}.")
                 loop.write("Linear Sum Assignment...")
             # Calculate the ideal permutations of the rows and columns
@@ -257,7 +300,7 @@ class PermutationCoordinateDescent:
             assert torch.allclose(ri, torch.arange(n)), \
                 "The rows of the cost tensor should not change."
 
-            if self.verbose:
+            if self.logging_level == logging.DEBUG:
                 loop.write("Done. \nProgress calculation...")
             # It is important to calculate the progress because
             #   the `_calculate_permutations_step`-method will be run several times.
@@ -274,7 +317,7 @@ class PermutationCoordinateDescent:
                 device=self.device_b
             )
 
-            if self.verbose:
+            if self.logging_level == logging.DEBUG:
                 loop.write(f"Done. Progress: {progress}\n")
 
             # Update the permutation.
@@ -287,7 +330,7 @@ class PermutationCoordinateDescent:
         Apply the calculated permutations to the model.
         """
         # Apply the permutations
-        if self.verbose:
+        if self.logging_level == logging.DEBUG:
             print("Applying permutations...")
 
         self.pinit.model_graph.apply_permutations()
