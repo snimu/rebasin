@@ -114,7 +114,18 @@ works perfectly fine (and I will probably produce some results for it at some po
 
 ## Results
 
-For results, see [rebasin-results](https://github.com/snimu/rebasin-results).
+For the full results, see [rebasin-results](https://github.com/snimu/rebasin-results)
+(I don't want to upload a bunch of images to this repo, so the results are in their own repo).
+
+Here is a little taste:
+
+<p align="center">
+    <img
+        src="https://github.com/snimu/rebasin-results/blob/main/hlb-CIFAR10/3x3-plot.png"
+        alt="hlb-CIFAR10: losses and accuracies of the model"
+        width="400"
+    />
+</p>
 
 ## Acknowledgements
 
@@ -154,8 +165,6 @@ https://pytorch.org/vision/0.15/models.html
 For testing, I forked [hlb-CIFAR10](https://github.com/tysam-code/hlb-CIFAR10) 
 by [@tysam-code](https://github.com/tysam-code):
 
-    cff-version: 1.2.0
-    message: "If you need to cite this codebase for any reason, please do so as below."
     authors:
     - family-names: "Balsam"
       given-names: "Tysam&"
