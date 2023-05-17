@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -178,7 +179,7 @@ class TorchvisionEval:
             self.model_b,
             input_data_b=input_data.to(device),
             device_b=device,
-            verbose=verbose
+            logging_level=logging.INFO if verbose else logging.ERROR
         )
         rebasin.calculate_permutations()
         rebasin.apply_permutations()
@@ -201,7 +202,7 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
-            verbose=verbose
+            logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
         results["a_b_original"] = lerp.metrics_interpolated
@@ -217,7 +218,7 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
-            verbose=verbose
+            logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
         results["a_b_rebasin"] = lerp.metrics_interpolated
@@ -232,7 +233,7 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
-            verbose=verbose
+            logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
         results["b_original_b_rebasin"] = lerp.metrics_interpolated
