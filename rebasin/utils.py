@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import math
 from collections.abc import Iterator, Sequence
 from typing import Any
 
@@ -19,14 +20,15 @@ def recalculate_batch_norms(
         input_indices: int | Sequence[int],
         device: torch.device | str | None,
         verbose: bool,
+        dataset_percentage: float = 1.0,
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
     """
     Recalculate the BatchNorm statistics of a model.
 
-    Use this after permuting the model, but only if the model contains
-    a BatchNorm.
+    Use this after permuting the model, if your model contains BatchNorm layers.
+    Returns early if the model doesn't contain any BatchNorm layers.
 
     Args:
         model:
@@ -45,6 +47,10 @@ def recalculate_batch_norms(
             The device on which to run the model.
         verbose:
             Whether to print progress.
+        dataset_percentage:
+            The percentage of the dataset to use for recalculating the statistics.
+            If the batch size is such that the last batch doesn't fully fit into
+            the percentage, it is still used.
         *forward_args:
             Any additional positional arguments to pass to the model's forward  pass.
         **forward_kwargs:
@@ -52,11 +58,9 @@ def recalculate_batch_norms(
     """
     if verbose:
         print("Recalculating BatchNorm statistics...")
-    types = [type(m) for m in model.modules()]
-    if (
-            nn.BatchNorm1d not in types
-            and nn.BatchNorm2d not in types
-            and nn.BatchNorm3d not in types
+    if not any(
+            isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
+            for m in model.modules()
     ):
         if verbose:
             print("No BatchNorm layers found in model.")
@@ -67,19 +71,14 @@ def recalculate_batch_norms(
 
     # Reset the running mean and variance
     for module in model.modules():
-        if (
-                not isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
-                or not hasattr(module, "running_mean")
-                or not hasattr(module, "running_var")
-                or module.running_mean is None
-                or module.running_var is None
-        ):
-            continue
+        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            module.reset_running_stats()
 
-        model.running_mean = torch.zeros_like(module.running_mean)
-        model.running_var = torch.zeros_like(module.running_var)
+    max_index = int(math.ceil(len(dataloader) * dataset_percentage))
+
     # Recalculate the running mean and variance
-    for batch in tqdm(dataloader, disable=not verbose):
+    for _ in tqdm(range(max_index), disable=not verbose):
+        batch = next(iter(dataloader))
         if isinstance(batch, Sequence):
             inputs, _ = get_inputs_labels(batch, input_indices, 0, device)
         else:

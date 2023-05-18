@@ -96,6 +96,23 @@ class TestInterpolation(BaseClass):
                 train_dataloader=0,  # type: ignore[arg-type]
             )
 
+    def test_sanity_checks_dataset_percentage(self) -> None:
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                eval_fn=self.eval_fn,
+                eval_mode="min",
+                dataset_percentage=1.5
+            )
+
+        with pytest.raises(AssertionError):
+            interp.Interpolation(
+                models=self.models,
+                eval_fn=self.eval_fn,
+                eval_mode="min",
+                dataset_percentage="not a float"  # type: ignore[arg-type]
+            )
+
     def test_sanity_checks_devices(self) -> None:
         with pytest.raises(AssertionError):
             interp.Interpolation(

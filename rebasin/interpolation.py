@@ -16,10 +16,10 @@ from rebasin.utils import parse_logging_level, recalculate_batch_norms
 
 class Interpolation:
     """
-    Interpolate between two models.
+    Interpolate between models.
 
     The base class for all interpolation classes.
-    This class is not meant to be used directly.
+    **This class is not meant to be used directly.**
 
     Args:
         models:
@@ -79,28 +79,14 @@ class Interpolation:
 
             *Default:* :code:`None`
 
-        devices:
-            Models may need a large amount of GPU-memory.
-            To avoid running out of memory,
-            the argument :code:`devices` can be used to specify which device
-            each of the given models in :code:`models` is on.
-            As each model is evaluated using the function given in :code:`eval_fn`,
-            the corresponding device is passed to :code:`eval_fn` as well.
+        dataset_percentage:
+            The percentage of the dataset to use
+            for recalculating the BatchNorm statistics.
+            Must be between :code:`0.0` and :code:`1.1`.
 
-            *Type:* :code:`Sequence[torch.device | str | None] | None`
+            *Type:* :code:`float`
 
-            *Default:* :code:`None`
-
-        device_interp:
-            The device to use for the interpolation.
-            If this is :code:`None`, no parameter will be moved
-            to a different device for interpolation, and the
-            interpolated model will be created on CPU.
-            Again, this argument is useful for saving on memory.
-
-            *Type:* :code:`torch.device | str | None`
-
-            *Default:* :code:`None`
+            *Default:* :code:`1.0`
 
         input_indices:
             If a training dataloader is given to :code:`train_dataloader`,
@@ -123,6 +109,29 @@ class Interpolation:
             *Type:* :code:`Sequence[int] | int`
 
             *Default:* :code:`0`
+
+        devices:
+            Models may need a large amount of GPU-memory.
+            To avoid running out of memory,
+            the argument :code:`devices` can be used to specify which device
+            each of the given models in :code:`models` is on.
+            As each model is evaluated using the function given in :code:`eval_fn`,
+            the corresponding device is passed to :code:`eval_fn` as well.
+
+            *Type:* :code:`Sequence[torch.device | str | None] | None`
+
+            *Default:* :code:`None`
+
+        device_interp:
+            The device to use for the interpolation.
+            If this is :code:`None`, no parameter will be moved
+            to a different device for interpolation, and the
+            interpolated model will be created on CPU.
+            Again, this argument is useful for saving on memory.
+
+            *Type:* :code:`torch.device | str | None`
+
+            *Default:* :code:`None`
 
         savedir:
             The directory to save the models in.
@@ -148,7 +157,7 @@ class Interpolation:
               / :code:`"critical"` / :code:`50`
             - :code:`logging.FATAL` / :code:`"FATAL"` / :code:`"fatal"` / :code:`50`
 
-            Type: int.
+            Type: :code:`int | str`.
 
             Default: :code:`logging.ERROR`.
     """
@@ -158,9 +167,10 @@ class Interpolation:
             eval_fn: Any = lambda model, device: 0.0,
             eval_mode: str = "min",
             train_dataloader: DataLoader[Any] | None = None,
+            dataset_percentage: float = 1.0,
+            input_indices: Sequence[int] | int = 0,
             devices: Sequence[torch.device | str] | None = None,
             device_interp: torch.device | str | None = None,
-            input_indices: Sequence[int] | int = 0,
             savedir: Path | str | None = None,
             logging_level: int | str = "ERROR"
     ) -> None:
@@ -169,6 +179,7 @@ class Interpolation:
             eval_fn,
             eval_mode,
             train_dataloader,
+            dataset_percentage,
             devices,
             device_interp,
             input_indices,
@@ -186,6 +197,7 @@ class Interpolation:
         self.eval_mode = eval_mode
         self.idx_fn = torch.argmax if eval_mode == "max" else torch.argmin
         self.train_dataloader = train_dataloader
+        self.dataset_percentage = dataset_percentage
         self.devices: Sequence[torch.device | str | None] = (
             devices if devices is not None
             else [None] * len(models)  # type: ignore[list-item]
@@ -222,6 +234,7 @@ class Interpolation:
             eval_fn: Any,
             eval_mode: str,
             train_dataloader: DataLoader[Any] | None,
+            dataset_percentage: float,
             devices: Sequence[torch.device | str] | None,
             device_interp: torch.device | str | None,
             input_indices: Sequence[int] | int,
@@ -236,6 +249,8 @@ class Interpolation:
         assert eval_mode in ["min", "max"], "Eval mode must be 'min' or 'max'"
 
         assert isinstance(train_dataloader, (DataLoader, type(None)))
+        assert isinstance(dataset_percentage, float), "dataset_percentage must be float"
+        assert 0.0 <= dataset_percentage <= 1.0, "dataset_percentage must be in [0, 1]"
 
         if devices is not None:
             assert isinstance(devices, Sequence)
@@ -257,7 +272,7 @@ class Interpolation:
 
 class LerpSimple(Interpolation):
     r"""
-    Linear interpolation between two models.
+    Linear interpolation between models.
 
     For two models and `s` steps, the interpolation looks like this
     (using :math:`m_a` to denote model number :math:`a`,
@@ -356,7 +371,8 @@ class LerpSimple(Interpolation):
                     self.train_dataloader,
                     self.input_indices,
                     device=self.device_interp,
-                    verbose=self.logging_level <= logging.INFO
+                    verbose=self.logging_level <= logging.INFO,
+                    dataset_percentage=self.dataset_percentage,
                 )
 
             # Evaluate

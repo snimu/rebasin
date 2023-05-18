@@ -15,14 +15,16 @@ def test_recalculate_batch_norms() -> None:
     bn = nn.BatchNorm2d(1)
     scc = SaveCallCount()
     model = torch.nn.Sequential(conv, bn, scc)
-    dataloader = DataLoader(TensorDataset(torch.rand(10, 1, 10, 10)), batch_size=10)
+    tensors = [torch.rand(10, 1, 10, 10) for _ in range(40)]  # 20 times x, y
+    dataset = TensorDataset(*tensors)
+    dataloader = DataLoader(dataset, batch_size=5)
 
     # Test whether recalculate_batch_norms works
     assert isinstance(bn.running_mean, torch.Tensor)
     assert torch.all(bn.running_mean == torch.zeros_like(bn.running_mean))
     recalculate_batch_norms(model, dataloader, [0], None, False)
     assert torch.all(bn.running_mean != torch.zeros_like(bn.running_mean))
-    assert scc.call_count > 0  # Test that scc works
+    assert scc.call_count == len(dataloader)  # Test that scc works
 
     # Test whether recalculate_batch_norms works in eval mode and resets it afterward
     model.eval()
@@ -37,6 +39,12 @@ def test_recalculate_batch_norms() -> None:
     model = torch.nn.Sequential(nn.Linear(3, 3), nn.Linear(3, 3), scc)
     recalculate_batch_norms(model, dataloader, 0, None, False)
     assert scc.call_count == 0
+
+    # Test whether the dataset_percentage-option works
+    scc.call_count = 0
+    model = torch.nn.Sequential(conv, bn, scc)
+    recalculate_batch_norms(model, dataloader, [0], None, False, dataset_percentage=0.5)
+    assert scc.call_count == int(len(dataloader) * 0.5 + 1e-6)
 
 
 def test_get_inputs_labels() -> None:
