@@ -322,15 +322,18 @@ class LerpSimple(Interpolation):
             print("Interpolating between models...")
 
         # INTERPOLATION
-        for step in tqdm(range(steps), disable=self.logging_level > logging.INFO):
+        loop = tqdm(range(steps), disable=self.logging_level > logging.INFO)
+        for step in loop:
             # Interpolate between the two models
             # (step + 1) so that it never starts at zero percent.
             # (steps + 2) so that it never ends at 100 percent.
             # This is because the start and end models already exist
             percentage = (step + 1) / (steps + 2)
-            self._interpolate_step(percentage=percentage, savedir=savedir)
+            self._interpolate_step(percentage=percentage, savedir=savedir, loop=loop)
 
-    def _interpolate_step(self, percentage: float, savedir: Path | None) -> None:
+    def _interpolate_step(
+            self, percentage: float, savedir: Path | None, loop: tqdm[Any]
+    ) -> None:
         # Interpolate between all models
         for model_num, (model1, model2) in enumerate(
                 zip(self.models[:-1], self.models[1:])
@@ -357,6 +360,7 @@ class LerpSimple(Interpolation):
                     device=self.device_interp,
                     verbose=self.logging_level <= logging.INFO,
                     dataset_percentage=self.dataset_percentage,
+                    loop=loop,
                 )
 
             # Evaluate

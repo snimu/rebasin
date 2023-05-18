@@ -21,6 +21,7 @@ def recalculate_batch_norms(
         device: torch.device | str | None,
         verbose: bool,
         dataset_percentage: float = 1.0,
+        loop: tqdm[Any] | None = None,
         *forward_args: Any,
         **forward_kwargs: Any
 ) -> None:
@@ -51,18 +52,23 @@ def recalculate_batch_norms(
             The percentage of the dataset to use for recalculating the statistics.
             If the batch size is such that the last batch doesn't fully fit into
             the percentage, it is still used.
+        loop:
+            A tqdm loop to use for progress.
+            If this is used in another loop, that loop should be passed here.
+            This way, instead of creating its own progress-bar and disrupting the other,
+            this function will simply update the title of the other progress-bar.
         *forward_args:
             Any additional positional arguments to pass to the model's forward  pass.
         **forward_kwargs:
             Any additional keyword arguments to pass to the model's forward pass.
     """
-    if verbose:
+    if verbose and loop is None:
         print("Recalculating BatchNorm statistics...")
     if not any(
             isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
             for m in model.modules()
     ):
-        if verbose:
+        if verbose and loop is None:
             print("No BatchNorm layers found in model.")
         return
 
@@ -77,7 +83,16 @@ def recalculate_batch_norms(
     max_index = int(math.ceil(len(dataloader) * dataset_percentage))
 
     # Recalculate the running mean and variance
-    for _ in tqdm(range(max_index), disable=not verbose):
+    inner_loop = (
+        tqdm(range(max_index), disable=not verbose)
+        if loop is None
+        else range(max_index)
+    )
+    for i in inner_loop:
+        if loop is not None:
+            loop.set_description(
+                f"Recalculating BatchNorm statistics ({i + 1}/{max_index})"
+            )
         batch = next(iter(dataloader))
         if isinstance(batch, Sequence):
             inputs, _ = get_inputs_labels(batch, input_indices, 0, device)
