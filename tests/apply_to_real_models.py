@@ -302,6 +302,7 @@ class TorchvisionEval:
         # Save results
         if verbose:
             print("\nSaving results...")
+        os.makedirs(self.results_dir, exist_ok=True)
         savefile = os.path.join(self.results_dir, f"{constructor.__name__}.csv")
         df_losses = pd.DataFrame(losses)
         df_accuracies1 = pd.DataFrame(accuracies1)
