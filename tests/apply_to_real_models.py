@@ -170,7 +170,10 @@ class TorchvisionEval:
 
         if (
                 not self.hparams.ignore_bn
-                and self.hparams.dataset != "imagenet"  # already trained on imagenet
+                and (
+                    self.hparams.dataset == "cifar10"
+                    or self.hparams.dataset_percentage < 1
+                )
         ):
             if verbose:
                 print("Recalculating BatchNorms for original models...")
