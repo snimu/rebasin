@@ -125,10 +125,9 @@ class TorchvisionEval:
         loss_fn = nn.CrossEntropyLoss()
         accuracies1: list[float] = []
         accuracies5: list[float] = []
-        val_dl = self.val_dl_a if model is self.model_a else self.val_dl_b
-        iters = self.hparams.percent_eval * len(val_dl) / self.hparams.batch_size
+        iters = self.hparams.percent_eval * len(self.val_dl)
 
-        for i, (inputs, labels) in enumerate(val_dl):
+        for i, (inputs, labels) in enumerate(self.val_dl):
             if i == iters:
                 break
 
@@ -151,9 +150,6 @@ class TorchvisionEval:
     ) -> None:
         # Setup
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        if verbose:
-            print("Setting up transforms...")
-        self.set_transforms(weights_a, weights_b)
 
         if verbose:
             print("Setting up models...")
@@ -166,8 +162,10 @@ class TorchvisionEval:
         ):
             if verbose:
                 print("Recalculating BatchNorms for original models...")
-            recalculate_batch_norms(self.model_a, self.train_dl_a, 0, device, verbose)
-            recalculate_batch_norms(self.model_b, self.train_dl_b, 0, device, verbose)
+            self.set_transforms(weights_a)
+            recalculate_batch_norms(self.model_a, self.train_dl, 0, device, verbose)
+            self.set_transforms(weights_b)
+            recalculate_batch_norms(self.model_b, self.train_dl, 0, device, verbose)
 
         self.original_model_b = copy.deepcopy(self.model_b)
 
@@ -180,7 +178,9 @@ class TorchvisionEval:
         accuracies5: dict[str, list[float]] = {
             "a_b_original": [], "a_b_rebasin": [], "b_original_b_rebasin": []
         }
+        self.set_transforms(weights_a)
         self.eval_fn(self.model_a, device)
+        self.set_transforms(weights_b)
         self.eval_fn(self.model_b, device)
         ma_loss = self.losses[0]
         mb_orig_loss = self.losses[1]
@@ -195,7 +195,8 @@ class TorchvisionEval:
         # Rebasin
         if verbose:
             print("\nRebasin")
-        input_data, _ = next(iter(self.train_dl_b))
+        self.set_transforms(weights_b)
+        input_data, _ = next(iter(self.train_dl))
         rebasin = PermutationCoordinateDescent(
             self.model_a,
             self.model_b,
@@ -207,7 +208,7 @@ class TorchvisionEval:
         if not self.hparams.ignore_bn:
             recalculate_batch_norms(
                 self.model_b,
-                self.train_dl_b,
+                self.train_dl,
                 input_indices=0,
                 device=device,
                 verbose=verbose
@@ -230,7 +231,7 @@ class TorchvisionEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
+            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
@@ -246,7 +247,7 @@ class TorchvisionEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
+            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
@@ -262,7 +263,7 @@ class TorchvisionEval:
             devices=[device, device],
             device_interp=device,
             eval_fn=self.eval_fn,
-            train_dataloader=self.train_dl_b if not self.hparams.ignore_bn else None,
+            train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR
         )
         lerp.interpolate(steps=self.hparams.steps)
@@ -289,91 +290,55 @@ class TorchvisionEval:
 
     def set_dataloaders(self) -> None:
         if self.hparams.dataset == "cifar10":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_cifar10_datasets()
+            train_ds, val_ds = self.get_cifar10_datasets()
         elif self.hparams.dataset == "imagenet":
-            train_ds_a, train_ds_b, val_ds_a, val_ds_b = self.get_imagenet_datasets()
+            train_ds, val_ds = self.get_imagenet_datasets()
         else:
             raise ValueError(f"Unknown dataset {self.hparams.dataset}")
 
-        self.train_dl_a = DataLoader(
-            train_ds_a,
+        self.train_dl = DataLoader(
+            train_ds,
             shuffle=True,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
-        self.train_dl_b = DataLoader(
-            train_ds_b,
-            shuffle=True,
-            num_workers=30,
-            batch_size=self.hparams.batch_size,
-        )
-        self.val_dl_a = DataLoader(
-            val_ds_a,
-            shuffle=False,
-            num_workers=30,
-            batch_size=self.hparams.batch_size,
-        )
-        self.val_dl_b = DataLoader(
-            val_ds_b,
+        self.val_dl = DataLoader(
+            val_ds,
             shuffle=False,
             num_workers=30,
             batch_size=self.hparams.batch_size,
         )
 
-    def get_cifar10_datasets(self) -> tuple[CIFAR10, CIFAR10, CIFAR10, CIFAR10]:
-        train_ds_a = CIFAR10(
+    def get_cifar10_datasets(self) -> tuple[CIFAR10, CIFAR10]:
+        train_ds = CIFAR10(
             root=self.root_dir,
             train=True,
-            download=False,
+            download=True,
         )
-        train_ds_b = CIFAR10(
-            root=self.root_dir,
-            train=True,
-            download=False,
-        )
-        val_ds_a = CIFAR10(
+        val_ds = CIFAR10(
             root=self.root_dir,
             train=False,
             download=False,
         )
-        val_ds_b = CIFAR10(
-            root=self.root_dir,
-            train=False,
-            download=False,
-        )
-        return train_ds_a, train_ds_b, val_ds_a, val_ds_b
+        return train_ds, val_ds
 
-    def get_imagenet_datasets(self) -> tuple[ImageNet, ImageNet, ImageNet, ImageNet]:
-        train_ds_a = ImageNet(
+    def get_imagenet_datasets(self) -> tuple[ImageNet, ImageNet]:
+        train_ds = ImageNet(
             root=self.root_dir,
             split="train",
         )
-        train_ds_b = ImageNet(
-            root=self.root_dir,
-            split="train",
-        )
-        val_ds_a = ImageNet(
+        val_ds = ImageNet(
             root=self.root_dir,
             split="val",
         )
-        val_ds_b = ImageNet(
-            root=self.root_dir,
-            split="val",
-        )
-        return train_ds_a, train_ds_b, val_ds_a, val_ds_b
+        return train_ds, val_ds
 
-    def set_transforms(self, weights_a: Any, weights_b: Any) -> None:
-        self.train_dl_a.dataset.transform = (  # type: ignore[attr-defined]
-            weights_a.transforms()
+    def set_transforms(self, weights: Any) -> None:
+        self.train_dl.dataset.transform = (  # type: ignore[attr-defined]
+            weights.transforms()
         )
-        self.train_dl_b.dataset.transform = (  # type: ignore[attr-defined]
-            weights_b.transforms()
-        )
-        self.val_dl_a.dataset.transform = (  # type: ignore[attr-defined]
-            weights_a.transforms()
-        )
-        self.val_dl_b.dataset.transform = (  # type: ignore[attr-defined]
-            weights_b.transforms()
+        self.val_dl.dataset.transform = (  # type: ignore[attr-defined]
+            weights.transforms()
         )
 
     def run(self) -> None:
