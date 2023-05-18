@@ -47,6 +47,12 @@ class TorchvisionEval:
             help="Dataset to evaluate on. Must be cifar10 or imagenet."
         )
         parser.add_argument(
+            "--dataset_percentage",
+            type=float, default=100.0,
+            help="Percentage of dataset to use for recalculating batchnorm. "
+                 "Between 0 and 100.",
+        )
+        parser.add_argument(
             "-e", "--exclude",
             type=str, nargs='*',
             help="Models to exclude from evaluation."
@@ -106,6 +112,11 @@ class TorchvisionEval:
         assert 0 < self.hparams.percent_eval <= 100, \
             "--percent_eval must be in ]0, 100]"
         self.hparams.percent_eval = self.hparams.percent_eval / 100
+
+        assert isinstance(self.hparams.dataset_percentage, float), \
+            "--dataset_percentage must be a float"
+        assert 0 < self.hparams.dataset_percentage <= 100, \
+            "--dataset_percentage must be in ]0, 100]"
 
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
@@ -211,7 +222,8 @@ class TorchvisionEval:
                 self.train_dl,
                 input_indices=0,
                 device=device,
-                verbose=verbose
+                verbose=verbose,
+                dataset_percentage=self.hparams.dataset_percentage
             )
 
         self.eval_fn(self.model_b, device)
@@ -232,7 +244,8 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
-            logging_level=logging.INFO if verbose else logging.ERROR
+            logging_level=logging.INFO if verbose else logging.ERROR,
+            dataset_percentage=self.hparams.dataset_percentage,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["a_b_original"] = [ma_loss, *self.losses] + [mb_orig_loss]
@@ -248,7 +261,8 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
-            logging_level=logging.INFO if verbose else logging.ERROR
+            logging_level=logging.INFO if verbose else logging.ERROR,
+            dataset_percentage=self.hparams.dataset_percentage,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["a_b_rebasin"] = [ma_loss, *self.losses] + [mb_rebasin_loss]
@@ -264,7 +278,8 @@ class TorchvisionEval:
             device_interp=device,
             eval_fn=self.eval_fn,
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
-            logging_level=logging.INFO if verbose else logging.ERROR
+            logging_level=logging.INFO if verbose else logging.ERROR,
+            dataset_percentage=self.hparams.dataset_percentage,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["b_original_b_rebasin"] = \
