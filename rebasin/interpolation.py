@@ -29,7 +29,7 @@ class Interpolation:
             *Type:* :code:`Sequence[nn.Module]`
 
         eval_fn:
-            The function to evaluate the models with.
+            The function to evaluate the interpolated models with.
             Usually, this simply calculates the loss for every batch in a
             validation or test dataloader, but it can be anything,
             including accuracy, or perplexity, etc.
@@ -206,24 +206,8 @@ class Interpolation:
         self.input_indices = input_indices
         self.savedir = savedir
 
-        if self.logging_level <= logging.INFO:
-            print("Evaluating given models...")
-
-        self.metrics_models = [
-            self.eval_fn(m, d)
-            for m, d in tqdm(
-                zip(self.models, self.devices),
-                disable=self.logging_level > logging.INFO
-            )
-        ]
-        if self.logging_level <= logging.INFO:
-            print("Done.")
         self.metrics_interpolated: list[float] = []
-
-        best_idx = int(self.idx_fn(torch.tensor(self.metrics_models)))
-        self.best_metric = self.metrics_models[best_idx]
-        self.best_model = self.models[best_idx]
-        self.best_model_name = f"model_{best_idx}.pt"
+        self.best_metric: float = float("inf") if eval_mode == "min" else -float("inf")
 
     def interpolate(self, steps: int = 20, savedir: str | Path | None = None) -> None:
         """Interpolate between the models and save the best one or all."""
@@ -306,7 +290,7 @@ class LerpSimple(Interpolation):
     def interpolate(self, steps: int = 20, savedir: str | Path | None = None) -> None:
         r"""
         Interpolate between the models and save the interpolated models
-        in :code:`self.best_model` if :code:`savedir` is given.
+        if :code:`savedir` is given.
 
         Args:
             steps:
@@ -391,7 +375,6 @@ class LerpSimple(Interpolation):
             if is_best:
                 self.best_metric = metric
                 self.best_model = model_interp
-                self.best_model_name = filename  # for later saving if not save_all
 
             if savedir is not None:
                 torch.save(model_interp.state_dict(), savedir.joinpath(filename))

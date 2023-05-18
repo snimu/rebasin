@@ -217,17 +217,9 @@ class TestLerpSimple(BaseClass):
         lerp.interpolate(steps=10)
 
         assert len(lerp.metrics_interpolated) == 10
-        assert len(lerp.metrics_models) == 2
 
         # With random data, there should be no duplicate losses.
-        assert len(set(lerp.metrics_models)) == 2
         assert len(set(lerp.metrics_interpolated)) == 10
-
-        # Check that the best model is the one with the lowest loss
-        best_model_loss = min(lerp.metrics_models)
-        best_interp_loss = min(lerp.metrics_interpolated)
-        best_loss = min(best_model_loss, best_interp_loss)
-        assert abs(best_loss - lerp.best_metric) < 1e-6 * lerp.best_metric
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU tests")
@@ -244,7 +236,6 @@ class TestInterpolationGPU(BaseClass):
         )
         lerp.interpolate(steps=10)
         assert len(lerp.metrics_interpolated) == 10
-        assert len(lerp.metrics_models) == 2
 
     @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="Not enough GPUs")
     def test_mlp_multi_gpu(self) -> None:
@@ -261,4 +252,3 @@ class TestInterpolationGPU(BaseClass):
         )
         lerp.interpolate(steps=10)
         assert len(lerp.metrics_interpolated) == 10
-        assert len(lerp.metrics_models) == 2
