@@ -117,6 +117,7 @@ class TorchvisionEval:
             "--dataset_percentage must be a float"
         assert 0 < self.hparams.dataset_percentage <= 100, \
             "--dataset_percentage must be in ]0, 100]"
+        self.hparams.dataset_percentage = self.hparams.dataset_percentage / 100.0
 
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
