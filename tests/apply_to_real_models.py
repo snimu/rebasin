@@ -180,6 +180,7 @@ class TorchvisionEval:
                 and (
                     self.hparams.dataset == "cifar10"
                     or self.hparams.dataset_percentage < 1
+                    or 0 < self.hparams.iterations < len(self.train_dl) - 1
                 )
         ):
             if verbose:
