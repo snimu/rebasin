@@ -53,6 +53,11 @@ class TorchvisionEval:
                  "Between 0 and 100.",
         )
         parser.add_argument(
+            "--iterations", type=int, default=-1,
+            help="Number of iterations to run to recalculate batch norm."
+                 "If < 1, then --dataset_percentage is used instead."
+        )
+        parser.add_argument(
             "-e", "--exclude",
             type=str, nargs='*',
             help="Models to exclude from evaluation."
@@ -119,6 +124,8 @@ class TorchvisionEval:
             "--dataset_percentage must be in ]0, 100]"
         self.hparams.dataset_percentage = self.hparams.dataset_percentage / 100.0
 
+        assert isinstance(self.hparams.iterations, int)
+
         self.root_dir = os.path.join(os.path.dirname(Path(__file__)), "data")
         self.results_dir = os.path.join(os.path.dirname(Path(__file__)), "results")
 
@@ -178,9 +185,17 @@ class TorchvisionEval:
             if verbose:
                 print("Recalculating BatchNorms for original models...")
             self.set_transforms(weights_a)
-            recalculate_batch_norms(self.model_a, self.train_dl, 0, device, verbose)
+            recalculate_batch_norms(
+                self.model_a, self.train_dl, 0, device, verbose,
+                dataset_percentage=self.hparams.dataset_percentage,
+                iterations=self.hparams.iterations,
+            )
             self.set_transforms(weights_b)
-            recalculate_batch_norms(self.model_b, self.train_dl, 0, device, verbose)
+            recalculate_batch_norms(
+                self.model_b, self.train_dl, 0, device, verbose,
+                dataset_percentage=self.hparams.dataset_percentage,
+                iterations=self.hparams.iterations,
+            )
 
         self.original_model_b = copy.deepcopy(self.model_b)
 
@@ -227,7 +242,8 @@ class TorchvisionEval:
                 input_indices=0,
                 device=device,
                 verbose=verbose,
-                dataset_percentage=self.hparams.dataset_percentage
+                dataset_percentage=self.hparams.dataset_percentage,
+                iterations=self.hparams.iterations,
             )
 
         self.eval_fn(self.model_b, device)
@@ -250,6 +266,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR,
             dataset_percentage=self.hparams.dataset_percentage,
+            dataset_iterations=self.hparams.iterations,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["a_b_original"] = [ma_loss, *self.losses] + [mb_orig_loss]
@@ -270,6 +287,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR,
             dataset_percentage=self.hparams.dataset_percentage,
+            dataset_iterations=self.hparams.iterations,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["a_b_rebasin"] = [ma_loss, *self.losses] + [mb_rebasin_loss]
@@ -290,6 +308,7 @@ class TorchvisionEval:
             train_dataloader=self.train_dl if not self.hparams.ignore_bn else None,
             logging_level=logging.INFO if verbose else logging.ERROR,
             dataset_percentage=self.hparams.dataset_percentage,
+            dataset_iterations=self.hparams.iterations,
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["b_original_b_rebasin"] = \

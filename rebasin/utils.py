@@ -21,6 +21,7 @@ def recalculate_batch_norms(
         device: torch.device | str | None,
         verbose: bool,
         dataset_percentage: float = 1.0,
+        iterations: int = -1,
         loop: tqdm[Any] | None = None,
         *forward_args: Any,
         **forward_kwargs: Any
@@ -57,6 +58,9 @@ def recalculate_batch_norms(
             If this is used in another loop, that loop should be passed here.
             This way, instead of creating its own progress-bar and disrupting the other,
             this function will simply update the title of the other progress-bar.
+        iterations:
+            If > 0, the number of iterations to use for recalculating the statistics.
+            Otherwise, :code:`dataset_percentage` is used.
         *forward_args:
             Any additional positional arguments to pass to the model's forward  pass.
         **forward_kwargs:
@@ -80,7 +84,11 @@ def recalculate_batch_norms(
         if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
             module.reset_running_stats()
 
-    max_index = int(math.ceil(len(dataloader) * dataset_percentage))
+    max_index = (
+        int(math.ceil(len(dataloader) * dataset_percentage))
+        if iterations < 1
+        else iterations
+    )
 
     # Recalculate the running mean and variance
     inner_loop = (

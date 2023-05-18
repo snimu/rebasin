@@ -88,6 +88,16 @@ class Interpolation:
 
             *Default:* :code:`1.0`
 
+        dataset_iterations:
+            An alternative to :code:`dataset_percentage`.
+            If it is > 0, then this will be the maximum number of batches
+            to use from the training dataloader for recalculating
+            the BatchNorm statistics.
+
+            *Type:* :code:`int`
+
+            *Default:* :code:`-1`
+
         input_indices:
             If a training dataloader is given to :code:`train_dataloader`,
             and the model has :code:`BatchNorm` layers, then the
@@ -168,6 +178,7 @@ class Interpolation:
             eval_mode: str = "min",
             train_dataloader: DataLoader[Any] | None = None,
             dataset_percentage: float = 1.0,
+            dataset_iterations: int = -1,
             input_indices: Sequence[int] | int = 0,
             devices: Sequence[torch.device | str] | None = None,
             device_interp: torch.device | str | None = None,
@@ -180,6 +191,7 @@ class Interpolation:
             eval_mode,
             train_dataloader,
             dataset_percentage,
+            dataset_iterations,
             devices,
             device_interp,
             input_indices,
@@ -198,6 +210,7 @@ class Interpolation:
         self.idx_fn = torch.argmax if eval_mode == "max" else torch.argmin
         self.train_dataloader = train_dataloader
         self.dataset_percentage = dataset_percentage
+        self.dataset_iterations = dataset_iterations
         self.devices: Sequence[torch.device | str | None] = (
             devices if devices is not None
             else [None] * len(models)  # type: ignore[list-item]
@@ -219,6 +232,7 @@ class Interpolation:
             eval_mode: str,
             train_dataloader: DataLoader[Any] | None,
             dataset_percentage: float,
+            dataset_iterations: int,
             devices: Sequence[torch.device | str] | None,
             device_interp: torch.device | str | None,
             input_indices: Sequence[int] | int,
@@ -235,6 +249,7 @@ class Interpolation:
         assert isinstance(train_dataloader, (DataLoader, type(None)))
         assert isinstance(dataset_percentage, float), "dataset_percentage must be float"
         assert 0.0 <= dataset_percentage <= 1.0, "dataset_percentage must be in [0, 1]"
+        assert isinstance(dataset_iterations, int), "dataset_iterations must be int"
 
         if devices is not None:
             assert isinstance(devices, Sequence)
@@ -361,6 +376,7 @@ class LerpSimple(Interpolation):
                     verbose=self.logging_level <= logging.INFO,
                     dataset_percentage=self.dataset_percentage,
                     loop=loop,
+                    iterations=self.dataset_iterations,
                 )
 
             # Evaluate
