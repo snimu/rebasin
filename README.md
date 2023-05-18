@@ -24,12 +24,34 @@ Can be applied to **arbitrary models**, without modification.
 
 ## Installation
 
-Requires [torchview](https://github.com/mert-kurttutan/torchview), which in turn
-requires graphviz. If you don't know how to install either, look at 
-[torchview's installation instructions](https://github.com/mert-kurttutan/torchview#installation).
-They are good!
+Requirements should be automatically installed, but one of them is graphviz, 
+which you might have to install per apt / brew / ... on your device.
 
-Right now, rebasin is only on PyPI, so you can install it with pip:
+The following install instructions are taken directly from 
+[torchview's installation instructions](https://github.com/mert-kurttutan/torchview#installation).
+
+Debian-based Linux distro (e.g. Ubuntu):
+
+```Bash
+apt-get install graphviz
+```
+
+Windows:
+
+```Bash
+choco install graphviz
+```
+
+macOS
+
+```Bash
+brew install graphviz
+```
+
+see more details [here](https://graphviz.readthedocs.io/en/stable/manual.html).
+
+
+Then, install rebasin via pip:
 
 ```bash
 pip install rebasin
@@ -40,45 +62,30 @@ pip install rebasin
 Currently, only weight-matching is implemented as a method for rebasing, 
 and only a simplified form of linear interpolation is implemented.
 
+The following is a minimal example. For now, the documentation lives in the docstrings,
+though I intend to create a proper one. 
+`PermutationCoordinateDescent` and `interpolation.LerpSimple`
+are the main classes.
+
 ```python
-import torch
-from torch import nn
 from rebasin import PermutationCoordinateDescent
 from rebasin import interpolation
 
-model_a, model_b, train_dl, val_dl, loss_fn = ...
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def eval_fn(model: nn.Module, model_device: str | torch.device | None = None) -> float:
-    loss = 0.0
-    for inputs, logits in val_dl:
-        if model_device is not None:
-            inputs = inputs.to(model_device)
-            logits = logits.to(model_device)
-        outputs = model(inputs)
-        loss = loss_fn(outputs, logits)
-    return loss / len(val_dl)
-
-
+model_a, model_b, train_dl= ...
 input_data = next(iter(train_dl))[0]
 
 # Rebasin
-pcd = PermutationCoordinateDescent(model_a, model_b, input_data)
-pcd.rebasin()
+pcd = PermutationCoordinateDescent(model_a, model_b, input_data)  # weight-matching
+pcd.rebasin()  # Rebasin model_b towards model_a. Automatically updates model_b
 
 # Interpolate
 lerp = interpolation.LerpSimple(
     models=[model_a, model_b],
-    devices=[device, device],
-    eval_fn=eval_fn,  # Can be any metric as long as the function takes a model and a device
-    eval_mode="min",  # "min" or "max"
-    train_dataloader=train_dl,  # Used to recalculate BatchNorm statistics; optional
+    devices=["cuda:0", "cuda:1"],  # Optional, defaults to cpu
+    device_interp="cuda:2",  # Optional, defaults to cpu
+    savedir="/path/to/save/interpolation"  # Optional, save all interpolated models
 )
-lerp.interpolate(steps=10)
-
-# Access model with lowest validation loss:
-lerp.best_model
+lerp.interpolate(steps=99)  # Interpolate 99 models between model_a and model_b
 ```
 
 ## Terminology
