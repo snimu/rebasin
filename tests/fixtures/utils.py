@@ -106,4 +106,6 @@ def accuracy(
         for k in topk:
             correct_k = correct[:k].flatten().sum(dtype=torch.float32)
             res.append(correct_k * (100.0 / batch_size))
+
+        res = [r.item() for r in res if isinstance(r, torch.Tensor)]
         return res
