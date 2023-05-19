@@ -160,7 +160,21 @@ Here is a little taste:
     />
 </p>
 
-It seems to work!
+While `PermutationCoordinateDescent` doesn't fully eliminate the loss-barrier, 
+it does reduce it significantly, and, surprisingly, even moreso for the accuracy-barrier.
+
+It seems likely to me that rebasin several models into the same loss-basin will 
+produce better results, if it works. This is because for that to work, the 
+common loss-basin would have to be a very wide one, which likely leads to better
+generalization. This is even one of the claims in the paper. 
+I might (*might*) implement the `MergeMany`-algorithm soon.
+
+It is important to point out that BatchNorm is very problematic in a model; it is necessary to recalculate the 
+running_stats for a significant number of training batches, which is very compute intensive.
+This wasn't a problem for models trained on CIFAR10, but I'm currently struggeling with
+the `torchvision.models` trained on ImageNet. I hope to get away with 200 batches of size 64
+(for a total of 12,800 images) for recalculating the `BatchNorm`s.
+Results will follow (at some point).
 
 ## Acknowledgements
 
