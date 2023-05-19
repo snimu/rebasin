@@ -65,7 +65,7 @@ and only a simplified form of linear interpolation is implemented.
 The following is a minimal example. For now, the documentation lives in the docstrings,
 though I intend to create a proper one. 
 `PermutationCoordinateDescent` and `interpolation.LerpSimple`
-are the main classes.
+are the main classes, beside `MergeMany` (see below).
 
 ```python
 from rebasin import PermutationCoordinateDescent
@@ -86,6 +86,29 @@ lerp = interpolation.LerpSimple(
     savedir="/path/to/save/interpolation"  # Optional, save all interpolated models
 )
 lerp.interpolate(steps=99)  # Interpolate 99 models between model_a and model_b
+```
+
+The `MergeMany`-algorithm is also implemented 
+(though there will be interface-changes regarding the devices in the future):
+
+```python
+from rebasin import MergeMany
+from torch import nn
+
+class ExampleModel(nn.Module):
+    ...
+
+model_a, model_b, model_c = ExampleModel(), ExampleModel(), ExampleModel()
+train_dl = ...
+
+# Merge
+merge = MergeMany(
+    models=[model_a, model_b, model_c],
+    working_model=ExampleModel(),
+    input_data=next(iter(train_dl))[0],
+)
+merged_model = merge.run()
+# The merged model is also accessible through merge.working_model
 ```
 
 ## Terminology
