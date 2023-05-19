@@ -108,7 +108,8 @@ merge = MergeMany(
     input_data=next(iter(train_dl))[0],
 )
 merged_model = merge.run()
-# The merged model is also accessible through merge.working_model
+# The merged model is also accessible through merge.working_model,
+#   but only after merge.run() has been called.
 ```
 
 ## Terminology
@@ -165,7 +166,7 @@ from rebasin import PermutationCoordinateDescent
 
 
 pcd = PermutationCoordinateDescent(...)
-print(pcd.pinit.model_graph)
+print(pcd.pinit.model_graph)  # pinit stands for "PermutationInitialization"
 ```
 
 ## Results
