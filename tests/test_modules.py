@@ -23,7 +23,11 @@ from rebasin.modules import (
     PermutationInfo,
     initialize_module,
 )
-from tests.fixtures.utils import model_change_percent, modules_and_module_nodes
+from tests.fixtures.utils import (
+    allclose,
+    model_change_percent,
+    modules_and_module_nodes,
+)
 
 
 class TestPermutation:
@@ -504,7 +508,7 @@ class TestInputPermIsOutputPermMultiDimModule:
 
         assert model_change_percent(model, model_orig) > 0.1
         y_new = model(x)
-        assert torch.allclose(y_new, y_orig)
+        assert allclose(y_new, y_orig)
 
 
 class TestMultiheadAttentionModule:
