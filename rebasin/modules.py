@@ -490,7 +490,7 @@ class MultiheadAttentionModule(ModuleBase):
             torch.arange(module_b.out_proj.weight.shape[0])
         )
 
-        self._input_shape = self.input_shape[0]
+        self._input_shape = [self.input_shape[0]]
 
     @property
     def input_permutation(self) -> Permutation | None:
