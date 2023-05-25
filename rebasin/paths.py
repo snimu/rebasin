@@ -9,6 +9,7 @@ from rebasin.modules import (  # type: ignore[attr-defined]
     Permutation,
     PermutationInfo,
 )
+from rebasin.utils import pairwise
 
 
 class LinearPath:
@@ -135,21 +136,12 @@ class LinearPath:
             self.input_permutation = None
             prev_path.output_permutation = None
 
-        pt0, pt1 = 0, 1
-        while pt1 < len(self):
-            if self[pt0].output_permutation is None:
-                pt0 += 1
-                if pt0 == pt1:
-                    pt1 += 1
-                continue
-            elif self[pt1].input_permutation is None:
-                pt1 += 1
+        for path0, path1 in pairwise(self):  # type: ignore[arg-type]
+            if path0.output_permutation is None or path1.input_permutation is None:
                 continue
 
-            if self[pt0].output_permutation_shape == self[pt1].input_permutation_shape:
-                self[pt1].input_permutation = self[pt0].output_permutation
-            pt0 += 1
-            pt1 += 1
+            if path0.output_permutation_shape == path1.input_permutation_shape:
+                path1.input_permutation = path0.output_permutation
 
         if next_path is None:
             self.output_permutation = None
