@@ -65,9 +65,11 @@ def test_merge_many() -> None:
     reason="This test takes a long time to run."
 )
 def test_merge_many_large_mlp() -> None:
-    models = [MLP(50, 50), MLP(50, 50), MLP(50, 50)]
-    x = torch.randn(50)
-    merge_many = MergeMany(models=models, working_model=MLP(50, 50), input_data=x)
+    size = 25
+    depth = 25
+    models = [MLP(size, depth), MLP(size, depth), MLP(size, depth)]
+    x = torch.randn(size)
+    merge_many = MergeMany(models=models, working_model=MLP(size, depth), input_data=x)
 
     # I cannot write any proper tests here, because I would need data for that,
     #   and I don't want to download any for testing.
