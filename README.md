@@ -122,7 +122,7 @@ In this document, I will use the following terminology:
 - `model_b`: The model that is changed by rebasin it towards `model_a`
     - `model_b (original)` for the unchanged, original `model_b`
     - `model_b (rebasin)` for the changed, rebasined `model_b`
-- **Path**: A linear sequence of modules in a model
+- **Path**: A sequence of modules in a model
 
 ## Limitations
 
@@ -174,7 +174,11 @@ print(pcd.pinit.model_graph)  # pinit stands for "PermutationInitialization"
 For the full results, see [rebasin-results](https://github.com/snimu/rebasin-results)
 (I don't want to upload a bunch of images to this repo, so the results are in their own repo).
 
-Here is a little taste:
+The clearest results were produces on [hlb-CIFAR10](https://github.com/tysam-code/hlb-CIFAR10).
+For results on that model, see 
+[here](https://github.com/snimu/rebasin-results/blob/main/hlb-CIFAR10/RESULTS.md).
+
+Here is a little taste of the results for that model:
 
 <p align="center">
     <img
@@ -187,18 +191,7 @@ Here is a little taste:
 While `PermutationCoordinateDescent` doesn't fully eliminate the loss-barrier, 
 it does reduce it significantly, and, surprisingly, even moreso for the accuracy-barrier.
 
-It seems likely to me that rebasin several models into the same loss-basin will 
-produce better results, if it works. This is because for that to work, the 
-common loss-basin would have to be a very wide one, which likely leads to better
-generalization. This is even one of the claims in the paper. 
-I might (*might*) implement the `MergeMany`-algorithm soon.
-
-It is important to point out that BatchNorm is very problematic in a model; it is necessary to recalculate the 
-running_stats for a significant number of training batches, which is very compute intensive.
-This wasn't a problem for models trained on CIFAR10, but I'm currently struggeling with
-the `torchvision.models` trained on ImageNet. I hope to get away with 200 batches of size 64
-(for a total of 12,800 images) for recalculating the `BatchNorm`s.
-Results will follow (at some point).
+You can also find results for the `MergeMany`-algorithm there.
 
 ## Acknowledgements
 
