@@ -270,9 +270,9 @@ class TorchvisionEval:
             dataset_iterations=self.hparams.iterations,
         )
         lerp.interpolate(steps=self.hparams.steps)
-        losses["a_b_original"] = [ma_loss, *self.losses] + [mb_orig_loss]
-        accuracies1["a_b_original"] = [ma_acc1, *self.accuracies1] + [mb_orig_acc1]
-        accuracies5["a_b_original"] = [ma_acc5, *self.accuracies5] + [mb_orig_acc5]
+        losses["a_b_original"] = [ma_loss, *self.losses, mb_orig_loss]
+        accuracies1["a_b_original"] = [ma_acc1, *self.accuracies1, mb_orig_acc1]
+        accuracies5["a_b_original"] = [ma_acc5, *self.accuracies5, mb_orig_acc5]
         self.losses.clear()
         self.accuracies1.clear()
         self.accuracies5.clear()
@@ -291,9 +291,9 @@ class TorchvisionEval:
             dataset_iterations=self.hparams.iterations,
         )
         lerp.interpolate(steps=self.hparams.steps)
-        losses["a_b_rebasin"] = [ma_loss, *self.losses] + [mb_rebasin_loss]
-        accuracies1["a_b_rebasin"] = [ma_acc1, *self.accuracies1] + [mb_rebasin_acc1]
-        accuracies5["a_b_rebasin"] = [ma_acc5, *self.accuracies5] + [mb_rebasin_acc5]
+        losses["a_b_rebasin"] = [ma_loss, *self.losses, mb_rebasin_loss]
+        accuracies1["a_b_rebasin"] = [ma_acc1, *self.accuracies1, mb_rebasin_acc1]
+        accuracies5["a_b_rebasin"] = [ma_acc5, *self.accuracies5, mb_rebasin_acc5]
         self.losses.clear()
         self.accuracies1.clear()
         self.accuracies5.clear()
@@ -313,11 +313,11 @@ class TorchvisionEval:
         )
         lerp.interpolate(steps=self.hparams.steps)
         losses["b_original_b_rebasin"] = \
-            [mb_orig_loss, *self.losses] + [mb_rebasin_loss]
+            [mb_orig_loss, *self.losses, mb_rebasin_loss]
         accuracies1["b_original_b_rebasin"] = \
-            [mb_orig_acc1, *self.accuracies1] + [mb_rebasin_acc1]
+            [mb_orig_acc1, *self.accuracies1, mb_rebasin_acc1]
         accuracies5["b_original_b_rebasin"] = \
-            [mb_orig_acc5, *self.accuracies5] + [mb_rebasin_acc5]
+            [mb_orig_acc5, *self.accuracies5, mb_rebasin_acc5]
         self.losses.clear()
         self.accuracies1.clear()
         self.accuracies5.clear()

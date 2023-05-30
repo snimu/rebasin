@@ -175,7 +175,7 @@ class LinearPath:
         if not modules_strings:
             return "\nLinearPath()\n"
 
-        modules_strings = ["LinearPath(", *modules_strings] + [")"]
+        modules_strings = ["LinearPath(", *modules_strings, ")"]
 
         # Normalize line width
         max_line_width = (
@@ -566,7 +566,7 @@ class PathSequence:
             reprs.append(path_repr)
             reprs.append("-" * width)
 
-        reprs = ["\nPathSequence(", *reprs] + [")"]
+        reprs = ["\nPathSequence(", *reprs, ")"]
         width = max(len(line) for text in reprs for line in text.splitlines())
 
         for i, text in enumerate(reprs):
