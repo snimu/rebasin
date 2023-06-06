@@ -224,7 +224,7 @@ def line_plot(file: str, dataset: str = "cifar10") -> None:
     #   ticks to be spaced evenly.
     dist_between_ticks = int((len(xlabels) - 1) / len(xlabels) * 4)
     xticks = list(xlabels[3 : -3 : 3])
-    xticks = [0, *xticks] + [100]
+    xticks = [0, *xticks, 100]
     axs[2].set_xticks(xticks)
 
     plt.xlabel('Interpolation: % w_b')
