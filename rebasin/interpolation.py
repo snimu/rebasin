@@ -355,11 +355,13 @@ class LerpSimple(Interpolation):
         ):
             model_interp = copy.deepcopy(model1).to(self.device_interp)
 
-            for param1, param2, param_interp in zip(
-                    model1.parameters(),
-                    model2.parameters(),
-                    model_interp.parameters(),
+            for (name, param1), (_, param2), (_, param_interp) in zip(
+                    model1.named_parameters(),
+                    model2.named_parameters(),
+                    model_interp.named_parameters(),
             ):
+                if not ("weight" in name or "bias" in name):
+                    continue
                 param_interp.data = torch.lerp(
                     param1.to(self.device_interp),
                     param2.to(self.device_interp),
