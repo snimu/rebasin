@@ -46,7 +46,7 @@ def get_info(file: str, dataset: str) -> tuple[SweepInfo, SweepInfo, SweepInfo]:
     file = file.split("/")[-1]  # only get model name
 
     model_name = file[:-4]  # remove .csv
-    minfo = [m for m in MODELS_AND_WEIGHTS if m.constructor.__name__ == model_name][0]
+    minfo = next(m for m in MODELS_AND_WEIGHTS if m.constructor.__name__ == model_name)
     wa = str(minfo.weights_a)
     wb = str(minfo.weights_b)
     wb_orig = wb + " (orig)"
